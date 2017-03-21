@@ -15,7 +15,7 @@ def readSogouReport():
         content = escape(strQ2B(file.read())).replace(r'\s','').replace(r'\n\d+\n','')
         if index == 0:
 
-          print(re.split(r'\n',re.sub(r'[\n\f][\s]+',r'',re.sub(r'[ \t]+',r'',content))))
+          re.split(r'\n',re.sub(r'[ \t]+',r'',content))
           break
         file.close()
       except UnicodeDecodeError as e:
