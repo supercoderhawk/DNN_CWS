@@ -67,6 +67,7 @@ def read_sogou_report():
   type = 'C000008'
   docs = os.listdir(base + type)
   for doc in docs:
+    file = None
     try:
       file = open(base + type + '/' + doc, 'r', encoding = 'gbk')
       content = escape(strQ2B(file.read())).replace(r'\s', '').replace(
@@ -108,14 +109,14 @@ def read_train_data(vocab_size):
 
 if __name__ == '__main__':
   vocab_size = 1000
-  pku = re.sub('[ ]+', SPLIT_CHAR, strQ2B(open('pku_training.utf8',
-                                               encoding = 'utf-8').read()))  # .splitlines()[10038:10039])
+  #pku = re.sub('[ ]+', SPLIT_CHAR, strQ2B(open('pku_training.utf8',
+  #                                             encoding = 'utf-8').read()))  # .splitlines()[10038:10039])
   # sentences.extend(open('msr_traning.utf8', encoding='utf-8').read().splitlines())
-  sentences = pku.splitlines()
-  vocab_index, label_index, count, dictionary = build_dataset_from_annotated(
-    sentences, vocab_size, SPLIT_CHAR)
-  v = reduce(lambda x, y: x + y, vocab_index)
-  l = reduce(lambda x, y: x + y, label_index)
-  print(len(v), len(l))
-
+  #sentences = pku.splitlines()
+  #vocab_index, label_index, count, dictionary = build_dataset_from_annotated(
+  #  sentences, vocab_size, SPLIT_CHAR)
+  #v = reduce(lambda x, y: x + y, vocab_index)
+  #l = reduce(lambda x, y: x + y, label_index)
+  #print(len(v), len(l))
+  read_train_data(100)
   # print(len(vocab_index),len(label_index))
