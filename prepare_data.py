@@ -1,13 +1,24 @@
 import collections
 import os
 import re
-from functools import reduce
 from utils import escape, strQ2B
 
 SPLIT_CHAR = '  '
 
+class Transform:
+  def __init__(self, input_file,output_file,mode):
+    self.MODE = ('annotated','raw')
+    self.input_file = input_file
+    self.output_file = output_file
+
 
 def build_dataset_from_raw(sentences, vocab_size):
+  """
+  
+  :param sentences: 
+  :param vocab_size: 
+  :return: 
+  """
   words = ''.join(sentences).replace(' ', '')
   count = [['UNK', -1]]  # 字符数量
   count.extend(collections.Counter(words).most_common(vocab_size - 1))
@@ -70,9 +81,7 @@ def read_sogou_report():
     file = None
     try:
       file = open(base + type + '/' + doc, 'r', encoding = 'gbk')
-      content = escape(strQ2B(file.read())).replace(r'\s', '').replace(
-        r'\n\d+\n', '')
-      # if index == 0:
+      content = escape(strQ2B(file.read())).replace(r'\s', '').replace(r'\n\d+\n', '')
       lines = re.split(r'\n', re.sub(r'[ \t\f]+', r'', content))
       for line in lines:
         sentences.extend(line.split('。'))
