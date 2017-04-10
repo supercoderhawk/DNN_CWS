@@ -2,7 +2,6 @@ import tensorflow as tf
 import math
 import numpy as np
 import sys
-# from datetime import datetime
 import time
 from prepare_data import read_train_data, build_dataset_from_raw
 
@@ -217,7 +216,6 @@ class SegDNN:
                 BB = tf.scatter_nd_add(self.A, [[current_tags[diff_index - 1], current_tags[diff_index]]],
                                        [-self.alpha])
 
-
           print(time.time() - start)
           times += time.time() - start
           # train_writer.add_graph(graph)
@@ -241,44 +239,6 @@ class SegDNN:
       grad = sess.run(self.grad_embed, {self.map_matrix: sen_matrix[i], self.x: embeds[i]})[0]
       sess.run(self.update_embed_op, {self.embedp: np.reshape(grad, [self.window_length, self.embed_size]),
                                       self.embed_index: np.expand_dims(embed_index[i], 1)})
-
-  def update_embeddings(self, embeddings, indices, delta_grad, val):
-    start = time.time()
-    tf.scatter_nd_add(embeddings, np.expand_dims(indices, 1),
-                      (self.alpha * delta_grad * val).reshape(3, self.embed_size))
-    print(time.time() - start)
-
-  def update_param_ex(self, param_index, pos, neg, x_val, op, p, sess):
-    start = time.time()
-    # grad_val = sess.run(self.grad_word_score[param_index],{self.x:x_val})[0]# sess.run(grad, {self.x: x_val})
-    grad_val = sess.run(self.grad_word_score[param_index], {self.x: x_val})[0]
-    # print(self.grad_word_score)
-    # k = None
-    # print(tf.gradients(self.grad_word_score, self.w2))
-    # print(k)
-    # print(self.word_scores)
-    # print('g')
-    # print(time.time() - start)
-    # start = time.time()
-    # g = sess.run(self.grad_word_score[0], {self.x: x_val})
-    # print(self.word_score.shape)
-    # print(self.w2.get_shape())
-    # print(type(x_val))
-    # g  = sess.run(tf.gradients(self.word_score, self.w2),{self.x: x_val})
-    # print(time.time()-start)
-    # print(g[0].shape)
-    print(grad_val.shape)
-    if (time.time() - start == 0):
-      # print('gg')
-      self.g += 1
-    start = time.time()
-    sess.run(op, {p: self.alpha * (grad_val[pos] - grad_val[neg])})
-    # param.assign_add(self.alpha * delta_grad * grad_val[0])
-    # tf.assign_add(param, self.alpha * delta_grad * grad_val[0])
-    # print('a')
-    # print(datetime.now().timestamp() - start)
-    if (time.time() - start == 0):
-      self.a += 1
 
   def viterbi(self, emission, A, init_A):
     """
