@@ -1,7 +1,6 @@
 import tensorflow as tf
 import math
 import numpy as np
-import sys
 import time
 from prepare_data import read_train_data, build_dataset_from_raw
 
@@ -18,10 +17,9 @@ class SegDNN:
     self.tags_count = len(self.tags)
     self.window_length = 2 * self.skip_window + 1
     self.concat_embed_size = self.embed_size * self.window_length
-    # self.generate_batch()
     self.x = None
-    self.g = 0
-    self.a = 0
+    self.embedp = None
+    self.embed_index = None
     self.grad_params = None
     self.params = None
     self.grad_params = [0] * 4
@@ -114,12 +112,9 @@ class SegDNN:
     graph = tf.Graph()
     words_batch, tags_batch = self.read_data(word_file_name, label_file_name, self.skip_window)
     print('start...')
-    # alpha = 0.02
     h = 300
 
     with graph.as_default():
-      merged = tf.summary.merge_all()
-
       self.x = tf.placeholder(tf.float32, shape=[self.concat_embed_size, 1], name='x')
       self.map_matrix = tf.placeholder(tf.float32, shape=[4, 4], name='mm')
       self.embeddings = tf.Variable(tf.random_uniform([self.vocab_size, self.embed_size], -1.0, 1.0), name='embeddings')
@@ -142,36 +137,22 @@ class SegDNN:
         self.grad_params[i] = tf.gradients(tf.matmul(self.map_matrix, self.word_score), self.params[i])
       self.grad_embed = tf.gradients(tf.matmul(self.map_matrix, self.word_score), self.x)
 
-      # init_A = [[0.5,0.5,0,0],[1,0,0,0.15],[0,0,0.1,0],[1,0.01,0,0]]
       self.A = tf.Variable(
         [[1, 1, 0, 0], [1, 1, 0, 0], [0, 0, 1, 1], [0, 0, 1, 1], [1, 1, 0, 0]], dtype=tf.float32)
+      self.Ap = tf.placeholder(tf.float32, shape=self.A.get_shape())
       self.embedp = tf.placeholder(tf.float32, shape=[self.window_length, self.embed_size])
       self.embed_index = tf.placeholder(tf.int32, shape=[self.window_length, 1])
-      # print(self.word_scores)
 
       self.param_holders = [self.w2p, self.w3p, self.b2p, self.b3p]
       self.update_ops = [self.w2.assign_add(self.w2p), self.w3.assign_add(self.w3p), self.b2.assign_add(self.b2p),
                          self.b3.assign_add(self.b3p)]
       self.update_embed_op = tf.scatter_nd_add(self.embeddings, self.embed_index,
                                                tf.reshape(self.embedp, [self.window_length, self.embed_size]))
-
-      param_grad = [[0] * 5] * 4
-      param_gradp = [[0] * 5] * 4
-      self.grad_word_scores = [[0] * 4] * 4
-      for w_index, w in enumerate(self.word_scores):
-        # self.grad_word_score[w_index] = tf.gradients(self.word_score, param_list[w_index])
-        for p_index, p in enumerate(self.params):
-          param_grad[w_index][p_index] = tf.gradients(w, p)
-
-          # paramp_list[w_index][p_index] =
-        param_grad[w_index][len(self.params)] = tf.gradients(w, self.x)
-
-      # print(tf.gradients(self.word_score,self.w2))
+      self.update_A_op = self.A.assign_add(self.Ap)
 
       saver = tf.train.Saver([self.embeddings, self.A].extend(self.params))
 
       with tf.Session(graph=graph) as sess:
-        # merged = tf.merge_all_summaries()
         train_writer = tf.summary.FileWriter('logs', sess.graph)
         init = tf.global_variables_initializer()
         init.run()
@@ -181,11 +162,9 @@ class SegDNN:
         for sentence_index, sentence in enumerate(words_batch):
           start = time.time()
           print('s:' + str(sentence_index))
-          # print(tf.nn.embedding_lookup(self.embeddings, sentence))
           sentence_embeds = tf.nn.embedding_lookup(self.embeddings, sentence).eval().reshape(
             [len(sentence), self.concat_embed_size, 1])
-          # sentence_embeds = tf.reshape(tf.nn.embedding_lookup(self.embeddings, sentence),
-          #                             [len(sentence), self.concat_embed_size, 1]).eval()
+          # 计算当前句子中每个字对标签的分值
           sentence_scores = np.array(sess.run(self.word_score, feed_dict={self.x: sentence_embeds[0]}).T,
                                      dtype=np.float32)
 
@@ -195,36 +174,46 @@ class SegDNN:
           A_tolVal = self.A.eval()
           init_A_val = np.array(A_tolVal[0])
           A_val = np.array(A_tolVal[1:])
-          current_tags = self.viterbi(sentence_scores, A_val, init_A_val)
+          current_tags = self.viterbi(sentence_scores, A_val, init_A_val)  # 当前参数下的最优路径
           diff_tags = np.subtract(tags_batch[sentence_index], current_tags)
-          update_index = np.where(diff_tags != 0)[0]
+          update_index = np.where(diff_tags != 0)[0]  # 标签不同的字符位置
 
-          update_pos_index = np.array(tags_batch[sentence_index], dtype=np.int32)[update_index]
-          update_neg_index = current_tags[update_index]
+          update_pos_index = np.array(tags_batch[sentence_index], dtype=np.int32)[update_index]  # 需要增加梯度的位置
+          update_neg_index = current_tags[update_index]  # 需要减少梯度的位置
           update_embed = sentence_embeds[update_index]
           sentence_matrix = self.gen_sentence_map_matrix(update_pos_index, update_neg_index)
           self.update_params(sentence_matrix, update_embed, sentence[update_index], sess)
-          for diff_index, diff_val in enumerate(diff_tags):
-            if diff_val != 0:
 
-              if diff_index == 0:
-                tf.scatter_nd_add(self.A, [[0, tags_batch[sentence_index][diff_index]]], [self.alpha])
-                tf.scatter_nd_add(self.A, [[0, current_tags[diff_index]]], [-self.alpha])
-              else:
-                before = tags_batch[sentence_index][diff_index - 1]
-                AA = tf.scatter_nd_add(self.A, [[before, tags_batch[sentence_index][diff_index]]], [self.alpha])
-                BB = tf.scatter_nd_add(self.A, [[current_tags[diff_index - 1], current_tags[diff_index]]],
-                                       [-self.alpha])
+          if len(update_index) == 0:
+            print(time.time() - start)
+            times += time.time() - start
+            continue
+          A_update = np.zeros([5, 4], dtype=np.float32)
+          if update_index[0] == 0:
+            A_update[0, update_pos_index[0]] = 1
+            A_update[0, update_neg_index[0]] = -1
+            A_update_pos_index = np.array(tags_batch[sentence_index], dtype=np.int32)[update_index[1:]]
+            A_update_pos_before = np.array(tags_batch[sentence_index], dtype=np.int32)[update_index[1:] - 1]
+            A_update_neg_index = current_tags[update_index[1:]]
+            A_update_neg_before = current_tags[update_index[1:] - 1]
+          else:
+            A_update_pos_index = np.array(tags_batch[sentence_index], dtype=np.int32)[update_index]
+            A_update_pos_before = np.array(tags_batch[sentence_index], dtype=np.int32)[update_index - 1]
+            A_update_neg_index = current_tags[update_index]
+            A_update_neg_before = current_tags[update_index - 1]
+
+          for _, (pos_before, pos_index, neg_before, neg_index) in enumerate(
+              zip(A_update_pos_before, A_update_pos_index, A_update_neg_before, A_update_neg_index)):
+            A_update[pos_before,pos_index] +=1
+            A_update[neg_before,neg_index] -=1
+
+          sess.run(self.update_A_op,{self.Ap:self.alpha*A_update})
 
           print(time.time() - start)
           times += time.time() - start
-          # train_writer.add_graph(graph)
-          # train_writer.add_run_metadata(sess.)
-          if sentence_index > 10:
-            break
+          #if sentence_index > 10000:
+            #break
         print(times / 60)
-        print(self.g)
-        print(self.a)
         train_writer.flush()
         saver.save(sess, 'tmp/model.ckpt')
 
@@ -255,6 +244,7 @@ class SegDNN:
     for line_index in range(1, emission.shape[0]):
       last_index = path[:, -1]
       cur_index = self.TAG_MAPS[last_index]  # 当前所有路径的可选的标记矩阵，2x2
+      # 当前所有可能路径的分值
       cur_res = A[last_index, cur_index] + emission[line_index, cur_index] + np.expand_dims(path_score[:, -1], 1)
       cur_max_index = np.argmax(cur_res, 1)
       path = np.insert(path, [path.shape[1]], np.expand_dims(np.choose(cur_max_index, cur_index.T), 1), 1)
@@ -325,7 +315,6 @@ class SegDNN:
       word_score = tf.matmul(w3, tf.sigmoid(tf.matmul(w2, x) + b2)) + b3
       A = tf.Variable(
         [[1, 1, 0, 0], [1, 1, 0, 0], [0, 0, 1, 1], [0, 0, 1, 1], [1, 1, 0, 0]], dtype=tf.float32)
-      # word_scores = tf.split(word_score, len(tags))
       saver = tf.train.Saver()
 
       with tf.Session(graph=graph) as sess:
@@ -339,7 +328,6 @@ class SegDNN:
           sentence_scores = np.append(sentence_scores, sess.run(word_score, feed_dict={x: embed}).T, 0)
         init_A_val = np.array(A.eval()[0])
         A_val = np.array(A.eval()[1:])
-        print(sentence_scores)
         current_tags = self.viterbi(sentence_scores, A_val, init_A_val)
         return self.tags2words(sentence, current_tags)
 
@@ -352,5 +340,6 @@ if __name__ == '__main__':
   # build_dataset(sentences,vocab_size)
   cws = SegDNN(vocab_size, embed_size, skip_window)
   cws.train()
-  # print(cws.seg('我们是朋友'))
+  #cws.generate_batch()
+  #print(cws.seg('小明来自北京的清华大学'))
   # cws.write_data(vocab_size, skip_window, 'word.txt', 'label.txt')
