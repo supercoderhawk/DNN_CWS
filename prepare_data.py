@@ -1,132 +1,96 @@
-#-*- coding: UTF-8 -*-
+# -*- coding: UTF-8 -*-
 import collections
-import os
 import re
-from utils import escape, strQ2B
+from utils import strQ2B
+import constant
 
-SPLIT_CHAR = '  '
 
 class PrepareData:
-  def __init__(self, input_file,output_file,mode,corpus):
-    self.MODE = ('annotated','raw')
+  def __init__(self, input_file, output_words_file, output_labels_file, vocab_size):
+    """
+    构造函数
+    :param input_file:  输入语料的完整文件路径 
+    :param output_words_file: 输出的字符索引文件完整路径，字符索引文件中的内容是输入预料中每个字在词汇表中对应的索引
+    :param output_label_file: 输出标签索引文件的完整路径，标签索引文件中的内容是输入语料中每个字对应的分词标签编号，采用SBIE标签，对应编号为0,1,2,3
+    :param vocab_size: 词汇表的大小
+    """
     self.input_file = input_file
-    self.output_file = output_file
+    self.output_words_file = output_words_file
+    self.output_labels_file = output_labels_file
+    self.vocab_size = vocab_size  # 词汇表大小
+    self.SPLIT_CHAR = '  '  # 分隔符：双空格
+    self.sentences = self.read_sentences()  # 从输入文件中读取的句子列表
+    self.words_index = []  # 语料文件中每个字对应的索引，以句子为单位
+    self.labels_index = []  # 语料库中每个字对应的索引，采用SBIE标记，以句子为单位
+    self.dictionary = {}  # 字符编号，从0开始，{'UNK':0,'STRT':'1','END':2,'我':3,'们':4}
+    self.count = [['UNK', 0], ['STRT', 0],
+                  ['END', 0]]  # 字符数量，其中'UNK'表示词汇表外的字符，'STAT'表示句子首字符之前的字符，'END'表示句子尾字符后面的字符，这两字符用于生成字的上下文
 
+  def read_sentences(self):
+    file = open(self.input_file, 'r', encoding='utf-8')
+    content = file.read()
+    sentences = re.sub('[ ]+', self.SPLIT_CHAR, strQ2B(content)).splitlines()  # 将词分隔符统一为双空格
+    file.close()
+    return sentences
 
-def build_dataset_from_raw(sentences, vocab_size):
-  """
-  
-  :param sentences: 
-  :param vocab_size: 
-  :return: 
-  """
-  words = ''.join(sentences).replace(' ', '')
-  count = [['UNK', -1]]  # 字符数量
-  count.extend(collections.Counter(words).most_common(vocab_size - 1))
-  dictionary = dict()  # 字符编号，从0开始，{'我':0,'们':1}
-  for word, _ in count:
-    dictionary[word] = len(dictionary)
-  data = list()
-  unk_count = 0
-  # 给语料中的每个字标对应的序号
-  for sentence in sentences:
-    sentence = sentence.replace(' ', '')
-    senData = list()
-    for word in sentence:
-      if word in dictionary:
-        index = dictionary[word]
-      else:
-        index = 0
-        unk_count += 1
-      senData.append(index)
-    data.append(senData)
-  count[0][1] = unk_count
-  # reverse_dictionary = dict(zip(dictionary.values(), dictionary.keys()))
-  return data, count, dictionary  # , reverse_dictionary
+  def build_basic_dataset(self):
+    words = ''.join(self.sentences).replace(' ', '')
+    self.count.extend(collections.Counter(words).most_common(self.vocab_size - 3))
 
+    for word, _ in self.count:
+      self.dictionary[word] = len(self.dictionary)
 
-def build_dataset_from_annotated(sentences, vocab_size, split_char):
-  vocab_index, count, dictionary = build_dataset_from_raw(sentences, vocab_size)
-  label_index = list()
-  empty = 0
-  for sentence in sentences:
-    sentence_label = list()
-    words = sentence.strip().split(split_char)
-    for word in words:
-      l = len(word)
-      if l == 0:
-        empty += 1
-        continue
-      elif l == 1:
-        sentence_label.append(0)
-      else:
-        sentence_label.append(1)
-        sentence_label.extend([2] * (l - 2))
-        sentence_label.append(3)
-        # index += l
-    label_index.append(sentence_label)
+    unk_count = 0
+    # 给语料中的每个字标对应的序号
+    for sentence in self.sentences:
+      sentence = sentence.replace(' ', '')
+      senData = []
+      for word in sentence:
+        if word in self.dictionary:
+          index = self.dictionary[word]
+        else:
+          index = 0
+          unk_count += 1
+        senData.append(index)
+      self.words_index.append(senData)
+    self.count[0][1] = unk_count
 
-  return vocab_index, label_index, count, dictionary
+  def build_corpus_dataset(self):
+    empty = 0
+    for sentence in self.sentences:
+      sentence_label = []
+      words = sentence.strip().split(self.SPLIT_CHAR)
+      for word in words:
+        l = len(word)
+        if l == 0:
+          empty += 1
+          continue
+        elif l == 1:
+          sentence_label.append(0)
+        else:
+          sentence_label.append(1)
+          sentence_label.extend([2] * (l - 2))
+          sentence_label.append(3)
+      self.labels_index.append(sentence_label)
 
+  def build_exec(self):
+    self.build_basic_dataset()
+    self.build_corpus_dataset()
+    words_file = open(self.output_words_file, 'w+', encoding='utf-8')
+    labels_file = open(self.output_labels_file, 'w+', encoding='utf-8')
 
-def read_sogou_report():
-  base = 'Reduced/'
-  types = os.listdir(base)
-  sentences = []
-  count = 0
-  index = 0
-  # for type in types:
-  type = 'C000008'
-  docs = os.listdir(base + type)
-  for doc in docs:
-    file = None
-    try:
-      file = open(base + type + '/' + doc, 'r', encoding = 'gbk')
-      content = escape(strQ2B(file.read())).replace(r'\s', '').replace(r'\n\d+\n', '')
-      lines = re.split(r'\n', re.sub(r'[ \t\f]+', r'', content))
-      for line in lines:
-        sentences.extend(line.split('。'))
-      # break
-      file.close()
-    except UnicodeDecodeError as e:
-      count += 1
-      file.close()
-      # sentences.append(content)
-
-  return sentences
-
-
-def read_raw_data():
-  stopList = open('StopList.txt').read().splitlines()
-  stopList.append('\n')
-
-  sentences = read_sogou_report()
-  file = open('sentences.txt', 'w', encoding = 'utf-8')
-  for sentence in sentences:
-    if len(sentence) > 0 and sentence not in stopList:
-      file.write(sentence + '\n')
-
-
-def read_train_data(vocab_size):
-  # vocab_size = 1000
-  pku = re.sub('[ ]+', SPLIT_CHAR,
-               strQ2B(open('pku_training.utf8', encoding = 'utf-8').read()))
-  sentences = pku.splitlines()
-  vocab_index, label_index, count, dictionary = build_dataset_from_annotated(
-    sentences, vocab_size, SPLIT_CHAR)
-  return sentences, vocab_index, label_index, count, dictionary
+    for _, (words, labels) in enumerate(zip(self.words_index, self.labels_index)):
+      words_file.write(' '.join(str(word) for word in words) + '\n')
+      labels_file.write(' '.join(str(label) for label in labels) + '\n')
+    words_file.close()
+    labels_file.close()
 
 
 if __name__ == '__main__':
-  vocab_size = 1000
-  #pku = re.sub('[ ]+', SPLIT_CHAR, strQ2B(open('pku_training.utf8',
-  #                                             encoding = 'utf-8').read()))  # .splitlines()[10038:10039])
-  # sentences.extend(open('msr_traning.utf8', encoding='utf-8').read().splitlines())
-  #sentences = pku.splitlines()
-  #vocab_index, label_index, count, dictionary = build_dataset_from_annotated(
-  #  sentences, vocab_size, SPLIT_CHAR)
-  #v = reduce(lambda x, y: x + y, vocab_index)
-  #l = reduce(lambda x, y: x + y, label_index)
-  #print(len(v), len(l))
-  read_train_data(100)
-  # print(len(vocab_index),len(label_index))
+
+  prepare_pku = PrepareData('corpus/pku_training.utf8', 'corpus/pku_training_words.txt', 'corpus/pku_training_labels.txt',
+                        constant.VOCAB_SIZE)
+  prepare_pku.build_exec()
+  prepare_msr = PrepareData('corpus/msr_training.utf8', 'corpus/msr_training_words.txt', 'corpus/msr_training_labels.txt',
+                        constant.VOCAB_SIZE)
+  prepare_msr.build_exec()
