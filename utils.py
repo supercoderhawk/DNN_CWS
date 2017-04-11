@@ -1,3 +1,7 @@
+#-*- coding:UTF-8 -*-
+import os
+import re
+
 def strQ2B(ustring):
   '''全角转半角'''
   rstring = ''
@@ -23,3 +27,29 @@ def escape(text):
           .replace("&tilde;", "~").replace("&mdash;", "—").replace("&copy;", "@")
           .replace("&#169;", "@").replace("♂", "").replace("\r\n|\r", "\n").replace('&nbsp',' '))
   return text
+
+def read_sogou_report():
+  base = 'Reduced/'
+  types = os.listdir(base)
+  sentences = []
+  count = 0
+  index = 0
+  # for type in types:
+  type = 'C000008'
+  docs = os.listdir(base + type)
+  for doc in docs:
+    file = None
+    try:
+      file = open(base + type + '/' + doc, 'r', encoding = 'gbk')
+      content = escape(strQ2B(file.read())).replace(r'\s', '').replace(r'\n\d+\n', '')
+      lines = re.split(r'\n', re.sub(r'[ \t\f]+', r'', content))
+      for line in lines:
+        sentences.extend(line.split('。'))
+      # break
+      file.close()
+    except UnicodeDecodeError as e:
+      count += 1
+      file.close()
+      # sentences.append(content)
+
+  return sentences
