@@ -40,6 +40,7 @@ class PrepareData:
     file = open(self.input_file, 'r', encoding='utf-8')
     content = file.read()
     sentences = re.sub('[ ]+', self.SPLIT_CHAR, strQ2B(content)).splitlines()  # 将词分隔符统一为双空格
+    sentences = list(filter(None,sentences))  # 去除空行
     file.close()
     return sentences
 
