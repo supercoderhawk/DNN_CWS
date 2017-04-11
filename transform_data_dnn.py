@@ -37,8 +37,8 @@ class TransformDataDNN(TransformData):
       extend_words.extend([2] * self.skip_window)
       word_batch = list(map(lambda item: extend_words[item[0] - self.skip_window:item[0] + self.skip_window + 1],
                             enumerate(extend_words[self.skip_window:-self.skip_window], self.skip_window)))
-      words_batch.append(word_batch)
-      labels_batch.append(self.labels_index[i])
+      words_batch.append(np.array(word_batch,dtype=np.int32))
+      labels_batch.append(np.array(self.labels_index[i],dtype=np.int32))
 
     return np.array(words_batch), np.array(labels_batch)
 
@@ -48,5 +48,5 @@ class TransformDataDNN(TransformData):
 
 
 if __name__ == '__main__':
-  trans_dnn = TransformDataDNN(constant.DNN_SKIP_WINDOW)
+  trans_dnn = TransformDataDNN(constant.DNN_SKIP_WINDOW,True)
   trans_dnn.generate_exe()
