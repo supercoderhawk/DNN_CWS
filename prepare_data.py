@@ -6,27 +6,35 @@ import constant
 
 
 class PrepareData:
-  def __init__(self, input_file, output_words_file, output_labels_file, output_dict_file, vocab_size):
+  def __init__(self, vocab_size, input_file, output_words_file, output_labels_file, dict_file,input_dict=False):
     """
     构造函数
+    :param vocab_size: 词汇表的大小
     :param input_file:  输入语料的完整文件路径 
     :param output_words_file: 输出的字符索引文件完整路径，字符索引文件中的内容是输入预料中每个字在词汇表中对应的索引
-    :param output_label_file: 输出标签索引文件的完整路径，标签索引文件中的内容是输入语料中每个字对应的分词标签编号，采用SBIE标签，对应编号为0,1,2,3
-    :param output_dict_file: 输出的词典文件的完整路径，词典文件内容是词与对应的索引，从0开始
-    :param vocab_size: 词汇表的大小
+    :param output_labels_file: 输出标签索引文件的完整路径，标签索引文件中的内容是输入语料中每个字对应的分词标签编号，采用SBIE标签，对应编号为0,1,2,3
+    :param dict_file: 词典文件的完整路径
+    :param input_dict: 指定是否输入词典，若为True，则使用dict_file指定的词典，若为False，则根据语料和vocab_size生成词典，并输出至dict_file指定的位置，默认为False
     """
     self.input_file = input_file
     self.output_words_file = output_words_file
     self.output_labels_file = output_labels_file
-    self.output_dict_file = output_dict_file
+    self.dict_file = dict_file
+    self.input_dict = input_dict
     self.vocab_size = vocab_size  # 词汇表大小
+    self.vocab_count = 0    # 语料库中字符数量，只在自动生成词汇表时会设置
     self.SPLIT_CHAR = '  '  # 分隔符：双空格
     self.sentences = self.read_sentences()  # 从输入文件中读取的句子列表
     self.words_index = []  # 语料文件中每个字对应的索引，以句子为单位
     self.labels_index = []  # 语料库中每个字对应的索引，采用SBIE标记，以句子为单位
-    self.dictionary = {}  # 字符编号，从0开始，{'UNK':0,'STRT':1,'END':2,'我':3,'们':4}
     self.count = [['UNK', 0], ['STRT', 0],
                   ['END', 0]]  # 字符数量，其中'UNK'表示词汇表外的字符，'STAT'表示句子首字符之前的字符，'END'表示句子尾字符后面的字符，这两字符用于生成字的上下文
+    # 根据是否指定词典路径来初始化词典，若指定，使用给定词典，未指定，根据语料生成
+    # 词典中项表示字符编号，从0开始，{'UNK':0,'STRT':1,'END':2,'我':3,'们':4}
+    if self.input_dict:
+      self.dictionary = self.read_dictionary(self.dict_file)
+    else:
+      self.dictionary = self.build_dictionary()
 
   def read_sentences(self):
     file = open(self.input_file, 'r', encoding='utf-8')
@@ -35,26 +43,40 @@ class PrepareData:
     file.close()
     return sentences
 
-  def build_basic_dataset(self):
+  def build_dictionary(self):
+    dictionary = {}
     words = ''.join(self.sentences).replace(' ', '')
+    self.vocab_count = len(collections.Counter(words))
     self.count.extend(collections.Counter(words).most_common(self.vocab_size - 3))
 
     for word, _ in self.count:
-      self.dictionary[word] = len(self.dictionary)
+      dictionary[word] = len(dictionary)
+    return dictionary
 
+  def read_dictionary(self, dict_path):
+    dict_file = open(dict_path,'r',encoding='utf-8')
+    dict_content = dict_file.read().splitlines()
+    dictionary = {}
+    dict_arr = map(lambda item: item.split(' '),dict_content)
+    for _,dict_item in enumerate(dict_arr):
+      dictionary[dict_item[0]] = dict_item[1]
+    dict_file.close()
+    return dictionary
+
+  def build_basic_dataset(self):
     unk_count = 0
     # 给语料中的每个字标对应的序号
     for sentence in self.sentences:
       sentence = sentence.replace(' ', '')
-      senData = []
+      sen_data = []
       for word in sentence:
         if word in self.dictionary:
           index = self.dictionary[word]
         else:
           index = 0
           unk_count += 1
-        senData.append(index)
-      self.words_index.append(senData)
+        sen_data.append(index)
+      self.words_index.append(sen_data)
     self.count[0][1] = unk_count
 
   def build_corpus_dataset(self):
@@ -80,22 +102,23 @@ class PrepareData:
     self.build_corpus_dataset()
     words_file = open(self.output_words_file, 'w+', encoding='utf-8')
     labels_file = open(self.output_labels_file, 'w+', encoding='utf-8')
-    dict_file = open(self.output_dict_file, 'w+', encoding='utf-8')
+
     for _, (words, labels) in enumerate(zip(self.words_index, self.labels_index)):
       words_file.write(' '.join(str(word) for word in words) + '\n')
       labels_file.write(' '.join(str(label) for label in labels) + '\n')
-    for (word, index) in self.dictionary.items():
-      dict_file.write(word + ' ' + str(index) + '\n')
-
+    if not self.input_dict:
+      dict_file = open(self.dict_file, 'w+', encoding='utf-8')
+      for (word, index) in self.dictionary.items():
+        dict_file.write(word + ' ' + str(index) + '\n')
+      dict_file.close()
     words_file.close()
     labels_file.close()
-    dict_file.close()
 
 
 if __name__ == '__main__':
-  prepare_pku = PrepareData('corpus/pku_training.utf8', 'corpus/pku_training_words.txt',
-                            'corpus/pku_training_labels.txt', 'corpus/pku_training_dict.txt', constant.VOCAB_SIZE)
+  prepare_pku = PrepareData(constant.VOCAB_SIZE,'corpus/pku_training.utf8', 'corpus/pku_training_words.txt',
+                            'corpus/pku_training_labels.txt', 'corpus/pku_training_dict.txt')
   prepare_pku.build_exec()
-  prepare_msr = PrepareData('corpus/msr_training.utf8', 'corpus/msr_training_words.txt',
-                            'corpus/msr_training_labels.txt', 'corpus/msr_training_dict.txt', constant.VOCAB_SIZE)
-  prepare_msr.build_exec()
+  # prepare_msr = PrepareData(constant.VOCAB_SIZE,'corpus/msr_training.utf8', 'corpus/msr_training_words.txt',
+  #                           'corpus/msr_training_labels.txt', 'corpus/msr_training_dict.txt')
+  # prepare_msr.build_exec()
