@@ -1,3 +1,4 @@
+#-*- coding: UTF-8 -*-
 import collections
 import os
 import re
@@ -5,8 +6,8 @@ from utils import escape, strQ2B
 
 SPLIT_CHAR = '  '
 
-class Transform:
-  def __init__(self, input_file,output_file,mode):
+class PrepareData:
+  def __init__(self, input_file,output_file,mode,corpus):
     self.MODE = ('annotated','raw')
     self.input_file = input_file
     self.output_file = output_file

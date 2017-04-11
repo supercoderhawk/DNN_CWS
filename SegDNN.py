@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 import tensorflow as tf
 import math
 import numpy as np
@@ -103,7 +104,7 @@ class SegDNN:
     label_file.close()
     return np.array(words_batch), np.array(label_batch)
 
-  def write_data(self, vocab_size, skip_window, word_file_name, label_file_name):
+  def write_data(self, word_file_name, label_file_name):
     words_batch, label_batch = self.generate_batch()
     word_file = open(word_file_name, 'w', encoding='utf-8')
     label_file = open(label_file_name, 'w', encoding='utf-8')
@@ -153,15 +154,13 @@ class SegDNN:
     for sentence_index, (sentence, tags) in enumerate(zip(words_batch, tags_batch)):
       start = time.time()
       print('s:' + str(sentence_index))
-      self.train_sentence(sentence,tags,sess)
+      print(self.train_sentence(sentence, tags, sess))
 
-
-  def train_sentence(self,sentence,tags,sess):
+  def train_sentence(self, sentence, tags, sess):
     sentence_embeds = tf.nn.embedding_lookup(self.embeddings, sentence).eval().reshape(
       [len(sentence), self.concat_embed_size, 1])
     # 计算当前句子中每个字对标签的分值
     sentence_scores = np.array(sess.run(self.word_score, feed_dict={self.x: sentence_embeds[0]}).T, dtype=np.float32)
-
     for embed in sentence_embeds[1:, :]:
       sentence_scores = np.append(sentence_scores, sess.run(self.word_score, feed_dict={self.x: embed}).T, 0)
 
@@ -178,8 +177,10 @@ class SegDNN:
     sentence_matrix = self.gen_sentence_map_matrix(update_pos_index, update_neg_index)
     self.update_params(sentence_matrix, update_embed, sentence[update_index], sess)
 
+    # 完全正确
     if len(update_index) == 0:
-      return
+      return 0
+
     A_update = np.zeros([5, 4], dtype=np.float32)
     if update_index[0] == 0:
       A_update[0, update_pos_index[0]] = 1
@@ -200,6 +201,7 @@ class SegDNN:
       A_update[neg_before, neg_index] -= 1
 
     sess.run(self.update_A_op, {self.Ap: self.alpha * A_update})
+    return self.cal_sentence_loss(sentence,tags,sess)
 
   def update_params(self, sen_matrix, embeds, embed_index, sess):
     length = len(sen_matrix)
@@ -244,6 +246,32 @@ class SegDNN:
       sen_matrix[index, ...] = self.map_matrices[pos_index[index], neg_index[index]]
 
     return sen_matrix
+
+  def cal_sentence_loss(self, sentence, tags, sess):
+    sentence_embeds = tf.nn.embedding_lookup(self.embeddings, sentence).eval().reshape(
+      [len(sentence), self.concat_embed_size, 1])
+
+    sentence_scores = np.array(sess.run(self.word_score, feed_dict={self.x: sentence_embeds[0]}).T, dtype=np.float32)
+    for embed in sentence_embeds[1:, :]:
+      sentence_scores = np.append(sentence_scores, sess.run(self.word_score, feed_dict={self.x: embed}).T, 0)
+
+    A_tolVal = self.A.eval()
+    init_A_val = np.array(A_tolVal[0])
+    A = np.array(A_tolVal[1:])
+    current_tags = self.viterbi(sentence_scores, A, init_A_val)  # 当前参数下的最优路径
+    loss = 0.0
+    before_corr = 0
+    before_cur = 0
+    for index, (cur_tag, corr_tag, scores) in enumerate(zip(current_tags, tags, sentence_scores)):
+      if index == 0:
+        loss += scores[corr_tag] + A[0, corr_tag] - scores[cur_tag] - A[0, cur_tag]
+      else:
+        loss += scores[corr_tag] + A[before_corr, corr_tag] - scores[cur_tag] - A[before_cur, cur_tag]
+
+      before_cur = cur_tag
+      before_corr = corr_tag
+
+    return loss
 
   def sentence2index(self, sentence):
     index = []
