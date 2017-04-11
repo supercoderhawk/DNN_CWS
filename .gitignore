@@ -1,8 +1,8 @@
 .idea/
 搜狗分类新闻.20061127.zip
-tmp/*
-logs/*
-
+tmp/
+logs/
+Reduced/
 # Created by .ignore support plugin (hsz.mobi)
 ### Python template
 # Byte-compiled / optimized / DLL files
