@@ -18,7 +18,7 @@ class TransformData:
     dictionary = {}
     dict_arr = map(lambda item: item.split(' '), dict_content)
     for _, dict_item in enumerate(dict_arr):
-      dictionary[dict_item[0]] = dict_item[1]
+      dictionary[dict_item[0]] = int(dict_item[1])
     dict_file.close()
     return dictionary
 
