@@ -4,7 +4,9 @@ import numpy as np
 
 class SegBase:
   def __init__(self):
+    self.TAGS = np.arange(4)
     self.TAG_MAPS = np.array([[0, 1], [2, 3], [2, 3], [0, 1]], dtype=np.int32)
+    self.tags_count = len(self.TAG_MAPS)
 
   def viterbi(self, emission, A, init_A):
     """
