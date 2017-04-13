@@ -27,6 +27,7 @@ class SegDNN:
     self.sess = None
     self.x = tf.placeholder(tf.float32, shape=[self.concat_embed_size, 1], name='x')
     self.map_matrix = tf.placeholder(tf.float32, shape=[4, 4], name='mm')
+    self.sentence_matrix = tf.placeholder(tf.float32, shape=[None,4],name='sm')
     self.embeddings = tf.Variable(tf.random_uniform([self.vocab_size, self.embed_size], -1.0, 1.0), name='embeddings')
     self.w2 = tf.Variable(
       tf.truncated_normal([self.h, self.concat_embed_size], stddev=1.0 / math.sqrt(self.concat_embed_size)),
@@ -65,6 +66,7 @@ class SegDNN:
     self.update_A_op = self.A.assign_add(self.Ap)
 
     self.map_matrices = self.gen_map_matrix()
+    self.optimizer = tf.train.GradientDescentOptimizer(self.alpha)
 
   def gen_map_matrix(self):
     map_matrix = np.zeros([4, 4, 4, 4], dtype=np.float32)
@@ -121,6 +123,23 @@ class SegDNN:
       #if sentence_index >= 500:
       #  break
     print(time.time() - start)
+
+  def train_sentence_gd(self,sentence, tags):
+    sentence_embeds = tf.nn.embedding_lookup(self.embeddings, sentence).eval(session=self.sess).reshape(
+      [len(sentence), self.concat_embed_size, 1])
+    # 计算当前句子中每个字对标签的分值
+    sentence_scores = np.array(self.sess.run(self.word_score, feed_dict={self.x: sentence_embeds[0]}).T,
+                               dtype=np.float32)
+    for embed in sentence_embeds[1:, :]:
+      sentence_scores = np.append(sentence_scores, self.sess.run(self.word_score, feed_dict={self.x: embed}).T, 0)
+
+    A_tolVal = self.A.eval(session=self.sess)
+    init_A_val = np.array(A_tolVal[0])
+    A_val = np.array(A_tolVal[1:])
+    current_tags = self.viterbi(sentence_scores, A_val, init_A_val)  # 当前参数下的最优路径
+    diff_tags = np.subtract(tags, current_tags)
+    update_index = np.where(diff_tags != 0)[0]  # 标签不同的字符位置
+
 
   def train_sentence(self, sentence, tags):
     sentence_embeds = tf.nn.embedding_lookup(self.embeddings, sentence).eval(session=self.sess).reshape(
@@ -316,4 +335,5 @@ if __name__ == '__main__':
   embed_size = 50
   cws = SegDNN(constant.VOCAB_SIZE, embed_size, constant.DNN_SKIP_WINDOW)
   cws.train()
-  # print(cws.seg('小明来自清华大学'))
+  # print(cws.seg('小明来自南京师范大学'))
+  # print(cws.seg('小明是上海理工大学的学生'))
