@@ -17,16 +17,23 @@ class TransformDataDNN(TransformData):
     self.window_length = 2 * self.skip_window + 1
     self.words_batch_base_path = 'corpus/dnn/words_batch'
     self.words_batch_path = self.words_batch_base_path + '.npy'
+    self.words_batch_flat_path = self.words_batch_base_path + '_flat.npy'
     self.labels_batch_base_path = 'corpus/dnn/labels_batch'
+    self.labels_batch_flat_path = self.labels_batch_base_path + '_flat.npy'
     self.labels_batch_path = self.labels_batch_base_path + '.npy'
     if not gen:
       if os.path.exists(self.words_batch_path) and os.path.exists(self.labels_batch_path):
         self.words_batch = np.load(self.words_batch_path)
         self.labels_batch = np.load(self.labels_batch_path)
+        self.words_batch_flat = np.load(self.words_batch_flat_path)
+        self.labels_batch_flat = np.load(self.labels_batch_flat_path)
     else:
-      self.words_batch, self.labels_batch = self.generate_batch()
+      self.words_batch, self.labels_batch = self.generate_sentences_batch()
+      self.words_batch_flat,self.labels_batch_flat = self.generate_batch()
+    self.words_count = len(self.words_batch_flat) # 语料库中字符总个数
+    self.context_count = self.words_count*self.window_length  # 生成的上下文词总长度
 
-  def generate_batch(self):
+  def generate_sentences_batch(self):
     words_batch = []
     labels_batch = []
     for i, words in enumerate(self.words_index):
@@ -42,9 +49,29 @@ class TransformDataDNN(TransformData):
 
     return np.array(words_batch), np.array(labels_batch)
 
+  def generate_batch(self):
+    words_batch = []
+    labels_batch = []
+    for _,(words,labels) in enumerate(zip(self.words_index,self.labels_index)):
+      if len(words) < self.skip_window:
+        return
+      extend_words = [1] * self.skip_window
+      extend_words.extend(words)
+      extend_words.extend([2] * self.skip_window)
+      word_batch = list(map(lambda item: extend_words[item[0] - self.skip_window:item[0] + self.skip_window + 1],
+                            enumerate(extend_words[self.skip_window:-self.skip_window], self.skip_window)))
+      words_batch.extend(np.array(word_batch,dtype=np.int32).flatten().tolist())
+      labels_batch.extend(labels)
+
+    return np.array(words_batch),np.array(labels_batch)
+
   def generate_exe(self):
     np.save(self.words_batch_base_path, self.words_batch)
+    np.save(self.words_batch_flat_path, self.words_batch_flat)
     np.save(self.labels_batch_base_path, self.labels_batch)
+    np.save(self.labels_batch_flat_path, self.labels_batch_flat)
+    # print(self.words_batch_flat.shape)
+    # print(self.labels_batch_flat.shape)
 
 
 if __name__ == '__main__':
