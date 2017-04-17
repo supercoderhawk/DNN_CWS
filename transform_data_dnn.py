@@ -35,8 +35,8 @@ class TransformDataDNN(TransformData):
       self.words_batch_flat,self.labels_batch_flat = self.generate_batch()
     self.words_count = len(self.labels_batch_flat) # 语料库中字符总个数
     self.context_count = self.words_count*self.window_length  # 生成的上下文词总长度
-    self.words_batch = self.words_batch_flat.reshape([self.words_count,self.window_length])
-    self.labels_batch = self.labels_batch_flat.reshape([self.words_count])
+    #self.words_batch = self.words_batch_flat.reshape([self.words_count,self.window_length])
+    #self.labels_batch = self.labels_batch_flat.reshape([self.words_count])
     #self.generate_segment_batch()
 
   def generate_sentences_batch(self):
