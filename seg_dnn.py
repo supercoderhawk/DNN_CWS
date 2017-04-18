@@ -20,7 +20,6 @@ class SegDNN:
     self.tags_count = len(self.tags)
     self.window_length = 2 * self.skip_window + 1
     self.concat_embed_size = self.embed_size * self.window_length
-    # self.epsilon = 100
     trans_dnn = TransformDataDNN(self.skip_window)
     self.dictionary = trans_dnn.dictionary
     self.words_batch = trans_dnn.words_batch
@@ -44,12 +43,8 @@ class SegDNN:
     self.b3 = tf.Variable(tf.zeros([self.tags_count, 1]), name='b3')
     self.word_score = tf.add(tf.matmul(self.w3, tf.sigmoid(tf.add(tf.matmul(self.w2, self.x), self.b2))), self.b3)
     self.params = [self.w2, self.w3, self.b2, self.b3]
-
-    #self.A = tf.Variable(
-    #  [[1, 1, 0, 0], [1, 1, 0, 0], [0, 0, 1, 1], [0, 0, 1, 1], [1, 1, 0, 0]], dtype=tf.float32, name='A')
     self.A = tf.Variable(
       [[1,1,0,0],[1, 1, 0, 0], [0, 0, 1, 1], [0, 0, 1, 1], [1, 1, 0, 0]], dtype=tf.float32, name='A')
-    #self.init_A = tf.Variable([1,1,1,1],dtype=tf.float32)
     self.Ap = tf.placeholder(tf.float32, shape=self.A.get_shape())
     self.embedp = tf.placeholder(tf.float32, shape=[None, self.embed_size])
     self.embed_index = tf.placeholder(tf.int32, shape=[None])
@@ -69,7 +64,6 @@ class SegDNN:
     self.sentence_holder = tf.placeholder(tf.int32,shape=[None,3])
     self.tags_holder = tf.placeholder(tf.int32,shape=[None])
     self.lookup_op = tf.nn.embedding_lookup(self.embeddings, self.sentence_holder)
-    #self.get_shape = tf.shape(self.sentence_holder)
 
   def train(self):
     """
@@ -103,18 +97,15 @@ class SegDNN:
     p_time_all = 0.0
     time_all = 0.0
     start_c = 0
-    #self.train_sentence(self.words_batch,self.tags_batch,len(self.tags_batch))
 
     for sentence_index, (sentence, tags) in enumerate(zip(self.words_batch, self.tags_batch)):
       start_s = time.time()
-    #  print('s:' + str(sentence_index))
       v_time,p_time = self.train_sentence(sentence, tags,len(tags))
 
       v_time_all += v_time
       p_time_all += p_time
       start_c += time.time()-start_s
       time_all += time.time() -start_s
-    #  # print(time.time()-start_s)
       if sentence_index % 2000 == 0:
         print('s:' + str(sentence_index))
         print(start_c)
@@ -152,7 +143,6 @@ class SegDNN:
     start = time.time()
     update_pos_tags = np.array(tags, dtype=np.int32)[update_index]  # 需要更新的字符的位置对应的正确字符标签
     update_neg_tags = current_tags[update_index]  # 需要更新的字符的位置对应的错误字符标签
-
     update_embed = sentence_embeds[:,update_index]
     sparse_indices = np.stack([np.concatenate([update_pos_tags,update_neg_tags],axis=-1),np.tile(np.arange(update_length),2)],axis=-1)
     sparse_values = np.concatenate([np.ones(update_length),-1*np.ones(update_length)])
