@@ -18,12 +18,9 @@ class TransformDataDNN(TransformData):
     self.words_batch_base_path = 'corpus/dnn/words_batch'
     self.words_batch_path = self.words_batch_base_path + '.npy'
     self.words_batch_flat_path = self.words_batch_base_path + '_flat.npy'
-    self.words_batch_segment_path = self.words_batch_base_path + '_segment.npy'
     self.labels_batch_base_path = 'corpus/dnn/labels_batch'
     self.labels_batch_flat_path = self.labels_batch_base_path + '_flat.npy'
-    self.labels_batch_segment_path = self.labels_batch_base_path + '_segment.npy'
     self.labels_batch_path = self.labels_batch_base_path + '.npy'
-    self.segment = 2000
     if not gen:
       if os.path.exists(self.words_batch_path) and os.path.exists(self.labels_batch_path):
         self.words_batch = np.load(self.words_batch_path)
@@ -35,9 +32,8 @@ class TransformDataDNN(TransformData):
       self.words_batch_flat,self.labels_batch_flat = self.generate_batch()
     self.words_count = len(self.labels_batch_flat) # 语料库中字符总个数
     self.context_count = self.words_count*self.window_length  # 生成的上下文词总长度
-    #self.words_batch = self.words_batch_flat.reshape([self.words_count,self.window_length])
-    #self.labels_batch = self.labels_batch_flat.reshape([self.words_count])
-    #self.generate_segment_batch()
+    self.whole_words_batch = self.words_batch_flat.reshape([self.words_count,self.window_length])
+    self.whole_labels_batch = self.labels_batch_flat.reshape([self.words_count])
 
   def generate_sentences_batch(self):
     words_batch = []
@@ -71,18 +67,12 @@ class TransformDataDNN(TransformData):
 
     return np.array(words_batch),np.array(labels_batch)
 
-  def generate_segment_batch(self):
-    self.words_batch_segment = self.words_batch_flat.reshape([self.words_count//self.segment+1,self.segment*self.window_length])
-    self.labels_batch_segment = self.labels_batch_flat.reshape([self.words_count//self.segment+1,self.segment])
+
   def generate_exe(self):
     np.save(self.words_batch_base_path, self.words_batch)
     np.save(self.words_batch_flat_path, self.words_batch_flat)
-    #np.save(self.words_batch_segment_path, self.words_batch_segment)
     np.save(self.labels_batch_base_path, self.labels_batch)
     np.save(self.labels_batch_flat_path, self.labels_batch_flat)
-    #np.save(self.labels_batch_segment_path, self.labels_batch_segment)
-    # print(self.words_batch_flat.shape)
-    # print(self.labels_batch_flat.shape)
 
 
 if __name__ == '__main__':
