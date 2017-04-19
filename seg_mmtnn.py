@@ -16,6 +16,8 @@ class SegMMTNN(SegBase):
     self.concat_size = self.vec_length * self.embed_size
     self.hidden_unit = 50
     self.r = 10
+    self.alpha = 0.2
+    self.k = 0.2
     self.x = tf.placeholder(dtype=tf.float32, shape=[self.concat_size, 1])
     self.w1 = tf.Variable(
       tf.truncated_normal([self.hidden_unit, self.concat_size], stddev=1.0 / math.sqrt(self.concat_size)))
