@@ -30,4 +30,5 @@ class SegBase:
       path_score = np.insert(path_score, [path_score.shape[1]], np.expand_dims(np.choose(cur_max_index, cur_res.T), 1),
                              1)
 
-    return path[np.argmax(path_score[:, -1]), :]
+    max_index = np.argmax(path_score[:, -1])
+    return path[max_index, :]
