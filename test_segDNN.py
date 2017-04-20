@@ -5,7 +5,6 @@ import numpy as np
 from seg_dnn import SegDNN
 import constant
 
-
 class TestSegDNN(TestCase):
   def setUp(self):
     self.cws = SegDNN(constant.VOCAB_SIZE, 50, constant.DNN_SKIP_WINDOW)
@@ -23,18 +22,20 @@ class TestSegDNN(TestCase):
     score = np.arange(10,170,10).reshape(4,4).T
     A = np.array([[1,1,0,0],[0,0,1,1],[0,0,1,1],[1,1,0,0]])
     init_A = np.array([1,1,0,0])
-    path = self.cws.viterbi(score,A,init_A)
+    current_path,current_score = self.cws.viterbi(score,A,init_A,True)
     correct_path = np.array([1,3,1,3])
-    self.assertTrue(np.all(path == correct_path))
+    correct_score = np.array([21,102,203,364])
+    self.assertTrue(np.all(current_path == correct_path))
+    self.assertTrue(np.all(current_score == correct_score))
 
-  def test_sentence2index(self):
-    pass
+  #def test_sentence2index(self):
+  #  pass
 
-  def test_index2seq(self):
-    pass
+  #def test_index2seq(self):
+  #  pass
 
-  def test_tags2words(self):
-    pass
+  #def test_tags2words(self):
+  #  pass
 
 
 if __name__ == '__main__':
