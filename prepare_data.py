@@ -6,7 +6,7 @@ import constant
 
 
 class PrepareData:
-  def __init__(self, vocab_size, input_file, output_words_file, output_labels_file, dict_file,input_dict=False):
+  def __init__(self, vocab_size, input_file, output_words_file, output_labels_file, dict_file, raw_file,input_dict=False):
     """
     构造函数
     :param vocab_size: 词汇表的大小
@@ -15,6 +15,8 @@ class PrepareData:
     :param output_labels_file: 输出标签索引文件的完整路径，标签索引文件中的内容是输入语料中每个字对应的分词标签编号，采用SBIE标签，对应编号为0,1,2,3
     :param dict_file: 词典文件的完整路径
     :param input_dict: 指定是否输入词典，若为True，则使用dict_file指定的词典，若为False，则根据语料和vocab_size生成词典，并输出至dict_file指定的位置，默认为False
+    :param output_raw_file: 指定是否输出语料库未切分的原始文件，默认为False
+    :param raw_file: 输出的语料库未切分的原始语料文件完整路径
     """
     self.input_file = input_file
     self.output_words_file = output_words_file
@@ -22,7 +24,13 @@ class PrepareData:
     self.dict_file = dict_file
     self.input_dict = input_dict
     self.vocab_size = vocab_size  # 词汇表大小
-    self.vocab_count = 0    # 语料库中字符数量，只在自动生成词汇表时会设置
+    # 指示是否输出原始文件
+    if raw_file == None or raw_file == '':
+      self.output_raw_file = False
+    else:
+      self.output_raw_file = True
+      self.raw_file = raw_file  # 输出的原始文件名
+    self.vocab_count = 0  # 语料库中字符数量，只在自动生成词汇表时会设置
     self.SPLIT_CHAR = '  '  # 分隔符：双空格
     self.sentences = self.read_sentences()  # 从输入文件中读取的句子列表
     self.words_index = []  # 语料文件中每个字对应的索引，以句子为单位
@@ -40,9 +48,15 @@ class PrepareData:
     file = open(self.input_file, 'r', encoding='utf-8')
     content = file.read()
     sentences = re.sub('[ ]+', self.SPLIT_CHAR, strQ2B(content)).splitlines()  # 将词分隔符统一为双空格
-    sentences = list(filter(None,sentences))  # 去除空行
+    sentences = list(filter(None, sentences))  # 去除空行
     file.close()
     return sentences
+
+  def build_raw_corpus(self):
+    file = open(self.raw_file,'w',encoding='utf-8')
+    for sentence in self.sentences:
+      file.write(sentence.replace(' ','')+'\n')
+    file.close()
 
   def build_dictionary(self):
     dictionary = {}
@@ -55,11 +69,11 @@ class PrepareData:
     return dictionary
 
   def read_dictionary(self, dict_path):
-    dict_file = open(dict_path,'r',encoding='utf-8')
+    dict_file = open(dict_path, 'r', encoding='utf-8')
     dict_content = dict_file.read().splitlines()
     dictionary = {}
-    dict_arr = map(lambda item: item.split(' '),dict_content)
-    for _,dict_item in enumerate(dict_arr):
+    dict_arr = map(lambda item: item.split(' '), dict_content)
+    for _, dict_item in enumerate(dict_arr):
       dictionary[dict_item[0]] = dict_item[1]
     dict_file.close()
     return dictionary
@@ -114,11 +128,13 @@ class PrepareData:
       dict_file.close()
     words_file.close()
     labels_file.close()
+    if self.output_raw_file:
+      self.build_raw_corpus()
 
 
 if __name__ == '__main__':
-  prepare_pku = PrepareData(constant.VOCAB_SIZE,'corpus/pku_training.utf8', 'corpus/pku_training_words.txt',
-                            'corpus/pku_training_labels.txt', 'corpus/pku_training_dict.txt')
+  prepare_pku = PrepareData(constant.VOCAB_SIZE, 'corpus/pku_training.utf8', 'corpus/pku_training_words.txt',
+                            'corpus/pku_training_labels.txt', 'corpus/pku_training_dict.txt','corpus/pku_training_raw.utf8')
   prepare_pku.build_exec()
   # prepare_msr = PrepareData(constant.VOCAB_SIZE,'corpus/msr_training.utf8', 'corpus/msr_training_words.txt',
   #                           'corpus/msr_training_labels.txt', 'corpus/msr_training_dict.txt')
