@@ -18,6 +18,14 @@ class TestSegDNN(TestCase):
     A_currect, init_A_currect, init_update = self.cws.gen_update_A(a, b)
     self.assertTrue(np.all(A_correct == A_currect))
     self.assertTrue(np.all(init_A_correct == init_A_currect))
+    a2 = np.array([0, 0, 0, 1, 3], dtype=np.int32)
+    b2 = np.array([1, 2, 3, 0, 0], dtype=np.int32)
+    A_correct = np.array([[1, 1, 0, 0], [0, 0, -1, 1], [0, 0, 0, -1], [-1, 0, 0, 0]], dtype=np.int32)
+    init_A_correct = np.array([1, -1, 0, 0])
+    A_currect, init_A_currect, init_update = self.cws.gen_update_A(a2, b2)
+    self.assertTrue(np.all(A_correct == A_currect))
+    self.assertTrue(np.all(init_A_correct == init_A_currect))
+
 
   def test_viterbi(self):
     score = np.arange(10, 170, 10).reshape(4, 4).T
