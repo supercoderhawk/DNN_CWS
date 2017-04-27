@@ -7,6 +7,7 @@ corpus/*
 !corpus/pku_training.utf8
 !corpus/msr_training.utf8
 StopList.txt
+data/
 # Created by .ignore support plugin (hsz.mobi)
 ### Python template
 # Byte-compiled / optimized / DLL files
