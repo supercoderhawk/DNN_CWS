@@ -1,6 +1,7 @@
-#-*- coding:UTF-8 -*-
+# -*- coding:UTF-8 -*-
 import os
 import re
+
 
 def strQ2B(ustring):
   '''全角转半角'''
@@ -25,8 +26,9 @@ def escape(text):
           .replace("&lt;", "<").replace("&#60;", "<").replace("&gt;", ">")
           .replace("&#62;", ">").replace("&nbsp;", " ").replace("&#160;", " ")
           .replace("&tilde;", "~").replace("&mdash;", "—").replace("&copy;", "@")
-          .replace("&#169;", "@").replace("♂", "").replace("\r\n|\r", "\n").replace('&nbsp',' '))
+          .replace("&#169;", "@").replace("♂", "").replace("\r\n|\r", "\n").replace('&nbsp', ' '))
   return text
+
 
 def read_sogou_report():
   base = 'Reduced/'
@@ -34,22 +36,32 @@ def read_sogou_report():
   sentences = []
   count = 0
   index = 0
-  # for type in types:
-  type = 'C000008'
-  docs = os.listdir(base + type)
-  for doc in docs:
-    file = None
-    try:
-      file = open(base + type + '/' + doc, 'r', encoding = 'gbk')
-      content = escape(strQ2B(file.read())).replace(r'\s', '').replace(r'\n\d+\n', '')
-      lines = re.split(r'\n', re.sub(r'[ \t\f]+', r'', content))
-      for line in lines:
-        sentences.extend(line.split('。'))
-      # break
-      file.close()
-    except UnicodeDecodeError as e:
-      count += 1
-      file.close()
-      # sentences.append(content)
+  for type in types:
+    # type = 'C000008'
+    docs = os.listdir(base + type)
+    for doc in docs:
+      file = None
+      try:
+        file = open(base + type + '/' + doc, 'r', encoding='gbk')
+        content = escape(strQ2B(file.read())).replace(r'\s', '').replace(r'\n\d+\n', '')
+        lines = re.split(r'\n', re.sub(r'[ \t\f]+', r'', content))
+        for line in lines:
+          sentences.extend(line.split('。'))
+        # break
+        file.close()
+      except UnicodeDecodeError as e:
+        count += 1
+        file.close()
+        # sentences.append(content)
 
   return sentences
+
+
+if __name__ == '__main__':
+  sentences = read_sogou_report()
+  file = open('corpus/sougou.txt', 'w', encoding='utf-8')
+  print(len(sentences))
+  content = ''.join(sentences)
+  content = re.sub('[\0]', '', content)
+  file.write(content)
+  file.close()
