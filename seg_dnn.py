@@ -210,52 +210,6 @@ class SegDNN:
 
     return A_update, init_A_update, update_init
 
-  def viterbi(self, emission, A, init_A, return_score=False):
-    """
-    维特比算法的实现，所有输入和返回参数均为numpy数组对象
-    :param emission: 发射概率矩阵，对应于本模型中的分数矩阵，4*length
-    :param A: 转移概率矩阵，4*4
-    :param init_A: 初始转移概率矩阵，4
-    :param return_score: 是否返回最优路径的分值，默认为False
-    :return: 最优路径，若return_score为True，返回最优路径及其对应分值
-    """
-
-    path = np.array([[0], [1]], dtype=np.int32)
-    path_score = np.array([[init_A[0] + emission[0, 0]], [init_A[1] + emission[1, 0]]], dtype=np.float32)
-
-    for line_index in range(1, emission.shape[1]):
-      last_index = path[:, -1]
-      cur_index = self.TAG_MAPS[last_index]  # 当前所有路径的可选的标记矩阵，2x2
-      # 当前所有可能路径的分值,2x2
-      cur_res = A[last_index, cur_index] + emission[cur_index, line_index] + np.expand_dims(path_score[:, -1], 1)
-      cur_max_index = np.argmax(cur_res, 1)
-      path = np.insert(path, [line_index], np.expand_dims(cur_index[[0, 1], cur_max_index], 1), 1)
-      path_score = np.insert(path_score, [line_index], np.expand_dims(cur_res[[0, 1], cur_max_index], 1), 1)
-
-    max_index = np.argmax(path_score[:, -1])
-    if return_score:
-      return path[max_index, :], path_score[max_index, :]
-    else:
-      return path[max_index, :]
-
-  def viterbi_all(self, emission, A, init_A, return_score=False):
-    path = np.expand_dims(np.arange(4, dtype=np.int32), 1)
-    path_score = np.expand_dims(init_A + emission[:, 0], 1)
-
-    for line_index in range(1, emission.shape[1]):
-      last_index = path[:, -1]
-      cur_res = A[last_index, :] + np.expand_dims(emission[self.line_index, line_index] + path_score[:, -1], 1)
-      cur_max_index = np.argmax(cur_res, 0)
-      cur_max_score = cur_res[self.line_index, cur_max_index]
-      path = np.insert(path, [line_index], np.expand_dims(cur_max_index, 1), 1)
-      path_score = np.insert(path_score, [line_index], np.expand_dims(cur_max_score, 1), 1)
-
-    max_index = np.argmax(path_score[:, -1])
-    if return_score:
-      return path[max_index, :], path_score[max_index, :]
-    else:
-      return path[max_index, :]
-
   def viterbi_fd(self, emission, A, init_A, return_score=False):
     """
     维特比算法的实现，所有输入和返回参数均为numpy数组对象
