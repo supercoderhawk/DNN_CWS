@@ -28,13 +28,13 @@ cws = SegDNN(constant.VOCAB_SIZE,50,constant.DNN_SKIP_WINDOW)
 print(cws.seg('我爱北京天安门')[0])
 ```
 
-详细示例可见文件`test.py`
+详细示例可见文件[`test.py`](https://github.com/supercoderhawk/DNN_CWS/blob/master/test.py)
 
 ## 相关代码文件说明
 
-* `seg_dnn.py`: 使用（感知机式）神经网络进行中文分词
-* `prepare_data.py`: 预处理语料库，包括msr和pku
-* `init.py`: 用于生成进行训练和测试的数据的脚本文件
+* [`seg_dnn.py`](https://github.com/supercoderhawk/DNN_CWS/blob/master/seg_dnn.py): 使用（感知机式）神经网络进行中文分词
+* [`prepare_data.py`](https://github.com/supercoderhawk/DNN_CWS/blob/master/prepare_data.py): 预处理语料库，包括msr和pku
+* [`init.py`](https://github.com/supercoderhawk/DNN_CWS/blob/master/init.py): 用于生成进行训练和测试的数据的脚本文件
 
 ## 参考论文：
 
