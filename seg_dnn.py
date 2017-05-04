@@ -301,7 +301,7 @@ class SegDNN:
 
     return words
 
-  def seg(self, sentence, model_path='model/model.ckpt'):
+  def seg(self, sentence, model_path='model/model.ckpt',debug=False):
     dtype = tf.float64
     tf.reset_default_graph()
     x = tf.placeholder(dtype, shape=[self.concat_embed_size, None], name='x')
@@ -337,28 +337,26 @@ class SegDNN:
       sentence_scores = sess.run(word_score, feed_dict={x: sentence_embeds})
       init_A_val = init_A.eval()
       A_val = A.eval()
-      #print(A_val)
-      # print(init_A_val)
+
       current_tags = self.viterbi(sentence_scores, A_val, init_A_val)
-      #print(sentence_scores.T)
-      #print(sentence_embeds[:,2])
-      w3v = w3.eval().T.tolist()
-      # print(w3v)
-      file = open('tmp/w3.txt', 'w')
+      if debug:
+        w3v = w3.eval().T.tolist()
+        # print(w3v)
+        file = open('tmp/w3.txt', 'w')
 
-      for i, v in enumerate(w3v):
-        v = list(map(lambda f: str(f), v))
-        file.write(' '.join(v) + '\n')
-      file.close()
+        for i, v in enumerate(w3v):
+          v = list(map(lambda f: str(f), v))
+          file.write(' '.join(v) + '\n')
+        file.close()
 
-      w2v = w2.eval().T.tolist()
-      # print(w3v)
-      file = open('tmp/w22.txt', 'w')
+        w2v = w2.eval().T.tolist()
+        # print(w3v)
+        file = open('tmp/w22.txt', 'w')
 
-      for i, v in enumerate(w2v):
-        v = list(map(lambda f: str(f), v))
-        file.write(' '.join(v) + '\n')
-      file.close()
+        for i, v in enumerate(w2v):
+          v = list(map(lambda f: str(f), v))
+          file.write(' '.join(v) + '\n')
+        file.close()
 
       return self.tags2words(sentence, current_tags),current_tags
 
