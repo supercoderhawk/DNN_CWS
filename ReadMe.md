@@ -43,4 +43,4 @@ print(cws.seg('我爱北京天安门')[0])
 
 ## Todo List
 
--[ ] 支持`pip`
+- [ ] 支持`pip`
