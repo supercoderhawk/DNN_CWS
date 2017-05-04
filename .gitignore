@@ -8,6 +8,7 @@ corpus/*
 !corpus/msr_training.utf8
 StopList.txt
 data/
+score.py
 # Created by .ignore support plugin (hsz.mobi)
 ### Python template
 # Byte-compiled / optimized / DLL files
