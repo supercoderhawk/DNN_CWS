@@ -56,6 +56,34 @@ def read_sogou_report():
 
   return sentences
 
+def estimate_cws(current_labels,correct_labels):
+  cor_dict = {}
+  curt_dict = {}
+  curt_start = 0
+  cor_start = 0
+  for label_index,(curt_label,cor_label) in enumerate(zip(current_labels,correct_labels)):
+    if cor_label == 0:
+      cor_dict[label_index] = label_index + 1
+    elif cor_label == 1:
+      cor_start = label_index
+    elif cor_label == 3:
+      cor_dict[cor_start] = label_index + 1
+
+    if curt_label == 0:
+      curt_dict[label_index] = label_index + 1
+    elif curt_label == 1:
+      curt_start = label_index
+    elif curt_label == 3:
+      curt_dict[curt_start] = label_index + 1
+
+  cor_count = 0
+  recall_length = len(curt_dict)
+  prec_length = len(cor_dict)
+  for curt_start in curt_dict.keys():
+    if curt_start in cor_dict and curt_dict[curt_start] == cor_dict[curt_start]:
+      cor_count += 1
+
+  return  cor_count,prec_length,recall_length
 
 if __name__ == '__main__':
   sentences = read_sogou_report()
