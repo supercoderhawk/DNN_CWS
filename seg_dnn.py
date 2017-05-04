@@ -9,8 +9,6 @@ import constant
 
 class SegDNN:
   def __init__(self, vocab_size, embed_size, skip_window):
-    self.TAG_MAPS = np.array([[0, 1], [2, 3], [2, 3], [0, 1]], dtype=np.int32)
-    self.TAG_MAPS_TF = tf.constant(self.TAG_MAPS, dtype=tf.int32)
     self.vocab_size = vocab_size
     self.embed_size = embed_size
     self.skip_window = skip_window
@@ -51,14 +49,10 @@ class SegDNN:
     self.update_embed_op = tf.scatter_update(self.embeddings, self.embed_index, self.embedp)
     self.lam = 0.0001
     self.optimizer = tf.train.GradientDescentOptimizer(self.alpha)
-    self.update_A_op = self.A.assign_add(self.Ap)
-    self.update_init_A_op = self.init_A.assign_add(self.init_Ap)
-    self.mul_A_op = tf.assign(self.A, tf.scalar_mul(1 - self.lam, self.A))
-    self.mul_init_A_op = tf.assign(self.init_A, tf.scalar_mul(1 - self.lam, self.init_A))
+    self.update_A_op = (1-self.lam)*self.A.assign_add(self.alpha*self.Ap)
+    self.update_init_A_op = (1-self.lam)*self.init_A.assign_add(self.alpha*self.init_Ap)
     self.loss = -tf.reduce_sum(tf.multiply(self.map_matrix, self.word_score))
-    self.loss_plus = [0] * 4
-    for i in range(4):
-      self.loss_plus[i] = tf.assign_sub(self.params[i], tf.scalar_mul(self.lam, self.params[i]))
+    self.params_regularization = list(map(lambda p:tf.assign_sub(p,(1-self.lam)*p),self.params))
     self.grad_embed = tf.gradients(tf.multiply(self.map_matrix, self.word_score), self.x)
     self.update_embed = self.alpha * (self.grad_embed[0]) + (1 - self.lam) * self.x
     self.train_loss = self.optimizer.minimize(self.loss, var_list=self.params)
@@ -91,11 +85,6 @@ class SegDNN:
     loss = []
     count = 10
 
-    w2 = self.w2.eval(session=self.sess)
-    with open('tmp/w2.txt','w') as w2f:
-      w2s = '\n'.join(list(map(lambda l: ' '.join(list(map(lambda d:str(d),l))),w2)))
-      w2f.write(w2s)
-
     for i in range(count):
       loss.append(self.train_exe() / 10000)
       print(i)
@@ -106,6 +95,10 @@ class SegDNN:
     self.sess.close()
 
   def train_exe(self):
+    """
+    进行一轮训练
+    :return: 
+    """
     start = time.time()
     time_all = 0.0
     start_c = 0
@@ -131,6 +124,13 @@ class SegDNN:
     return math.fabs(loss)
 
   def train_sentence(self, sentence, tags, length):
+    """
+    对每个句子进行训练
+    :param sentence: 
+    :param tags: 
+    :param length: 
+    :return: 
+    """
     sentence_embeds = self.sess.run(self.lookup_op, feed_dict={self.sentence_holder: sentence}).reshape(
       [length, self.concat_embed_size]).T
     sentence_scores = self.sess.run(self.word_score, feed_dict={self.x: sentence_embeds})
@@ -160,11 +160,9 @@ class SegDNN:
     # 更新转移矩阵
     A_update, init_A_update, update_init = self.gen_update_A(tags, current_tags)
     if update_init:
-      self.sess.run(self.update_init_A_op, feed_dict={self.init_Ap: self.alpha * init_A_update})
-      self.sess.run(self.mul_init_A_op)
+      self.sess.run(self.update_init_A_op, feed_dict={self.init_Ap: init_A_update})
 
-    self.sess.run(self.update_A_op, {self.Ap: self.alpha * A_update})
-    self.sess.run(self.mul_A_op)
+    self.sess.run(self.update_A_op, {self.Ap: A_update})
 
   def update_params(self, sen_matrix, embeds, embed_index, update_length):
     """
@@ -176,8 +174,8 @@ class SegDNN:
     :return: 
     """
 
-    self.sess.run(self.loss_plus)
     self.sess.run(self.train_loss, feed_dict={self.x: embeds, self.map_matrix: sen_matrix})
+    self.sess.run(self.params_regularization)
 
     for i in range(update_length):
       embed = np.expand_dims(embeds[:, i], 1)
