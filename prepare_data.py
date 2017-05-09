@@ -111,6 +111,11 @@ class PrepareData:
           sentence_label.extend([2] * (l - 2))
           sentence_label.append(3)
       self.labels_index.append(sentence_label)
+  def build_test_corpus(self,filename):
+    with open(filename,'w',encoding='utf-8') as file:
+      for _,(sentence,sentence_label) in enumerate(zip(self.sentences,self.labels_index)):
+        file.write(sentence.replace(' ','')+'\n')
+        file.write(' '.join(map(lambda i:str(i),sentence_label))+'\n')
 
   def build_exec(self):
     self.build_basic_dataset()
@@ -130,6 +135,7 @@ class PrepareData:
     labels_file.close()
     if self.output_raw_file:
       self.build_raw_corpus()
+    self.build_test_corpus('data/test.utf8')
 
 
 if __name__ == '__main__':
