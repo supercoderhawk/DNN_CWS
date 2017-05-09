@@ -40,7 +40,8 @@ print(cws.seg('我爱北京天安门')[0])
 
 * [deep learning for chinese word segmentation and pos tagging](www.aclweb.org/anthology/D13-1061) （已完全实现）
 * [Max-Margin Tensor Neural Network for Chinese Word Segmentation](www.aclweb.org/anthology/P14-1028) （正在实现）
-
+* [Long Short-Term Memory Neural Networks for Chinese Word Segmentation](http://www.emnlp2015.org/proceedings/EMNLP/pdf/EMNLP141.pdf) (正在实现)
 ## Todo List
 
 - [ ] 支持`pip`
+- [ ] 提供词性标注功能
