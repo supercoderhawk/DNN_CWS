@@ -6,10 +6,12 @@ import time
 
 import constant
 from transform_data_lstm import TransformDataLSTM
+from seg_base import SegBase
 
 
-class SegLSTM:
+class SegLSTM(SegBase):
   def __init__(self):
+    SegBase.__init__(self)
     self.dtype = tf.float32
     self.skip_window_left = constant.LSTM_SKIP_WINDOW_LEFT
     self.skip_window_right = constant.LSTM_SKIP_WINDOW_RIGHT
@@ -21,6 +23,7 @@ class SegLSTM:
     trans = TransformDataLSTM()
     self.words_batch = trans.words_batch
     self.tags_batch = trans.labels_batch
+    self.dictionary = trans.dictionary
     self.vocab_size = constant.VOCAB_SIZE
     self.alpha = 0.02
     self.lam = 0.001
@@ -68,15 +71,16 @@ class SegLSTM:
     return path
 
   def train_exe(self):
+    saver = tf.train.Saver([self.embeddings, self.A, self.init_A].extend(self.params), max_to_keep=100)
     self.sess.graph.finalize()
     last_time = time.time()
-    saver = tf.train.Saver([self.embeddings, self.A,self.init_A].extend(self.params), max_to_keep=100)
     for sentence_index, (sentence, tags) in enumerate(zip(self.words_batch, self.tags_batch)):
       self.train_sentence(sentence, tags, len(tags))
       if sentence_index % 500 == 0:
+        print(sentence_index)
         print(time.time() - last_time)
         last_time = time.time()
-
+    saver.save(self.sess, 'tmp/lstm-model%d.ckpt' % 0)
 
   def train_sentence(self, sentence, tags, length):
     sentence_embeds = self.sess.run(self.lookup_op, feed_dict={self.sentence_holder: sentence}).reshape(
@@ -109,7 +113,7 @@ class SegLSTM:
     # 更新词向量
     embed_index = sentence[update_index]
     for i in range(update_length):
-      embed = np.expand_dims(np.expand_dims(update_embed[:, i], 0),0)
+      embed = np.expand_dims(np.expand_dims(update_embed[:, i], 0), 0)
       grad = self.sess.run(self.grad_embed, feed_dict={self.x_plus: embed,
                                                        self.map_matrix: np.expand_dims(sentence_matrix[:, i], 1)})[0]
 
@@ -146,41 +150,6 @@ class SegLSTM:
       before_curr = curr_tag
 
     return A_update, init_A_update, update_init
-
-  def viterbi(self, emission, A, init_A, return_score=False):
-    """
-    维特比算法的实现，所有输入和返回参数均为numpy数组对象
-    :param emission: 发射概率矩阵，对应于本模型中的分数矩阵，4*length
-    :param A: 转移概率矩阵，4*4
-    :param init_A: 初始转移概率矩阵，4
-    :param return_score: 是否返回最优路径的分值，默认为False
-    :return: 最优路径，若return_score为True，返回最优路径及其对应分值
-    """
-
-    length = emission.shape[1]
-    path = np.ones([4, length], dtype=np.int32) * -1
-    corr_path = np.zeros([length], dtype=np.int32)
-    path_score = np.ones([4, length], dtype=np.float64) * (np.finfo('f').min / 2)
-    path_score[:, 0] = init_A + emission[:, 0]
-
-    for pos in range(1, length):
-      for t in range(4):
-        for prev in range(4):
-          temp = path_score[prev][pos - 1] + A[prev][t] + emission[t][pos]
-          if temp >= path_score[t][pos]:
-            path[t][pos] = prev
-            path_score[t][pos] = temp
-
-    max_index = np.argmax(path_score[:, -1])
-    corr_path[length - 1] = max_index
-    for i in range(length - 1, 0, -1):
-      max_index = path[max_index][i]
-      corr_path[i - 1] = max_index
-    if return_score:
-      return corr_path, path_score[max_index, :]
-    else:
-      return corr_path
-
 
 if __name__ == '__main__':
   seg = SegLSTM()
