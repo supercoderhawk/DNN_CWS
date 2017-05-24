@@ -40,7 +40,7 @@ class TransformDataDNN(TransformData):
     labels_batch = []
     for i, words in enumerate(self.words_index):
       if len(words) < self.skip_window:
-        return
+        continue
       extend_words = [1] * self.skip_window
       extend_words.extend(words)
       extend_words.extend([2] * self.skip_window)
