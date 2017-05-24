@@ -35,11 +35,13 @@ class SegLSTM(SegBase):
       tf.random_uniform([self.vocab_size, self.embed_size], -1.0 / math.sqrt(self.embed_size),
                         1.0 / math.sqrt(self.embed_size),
                         dtype=self.dtype), dtype=self.dtype, name='embeddings')
-    self.w = tf.Variable(tf.zeros([self.tag_count, self.hidden_units]), dtype=self.dtype)
-    self.b = tf.Variable(tf.zeros([self.tag_count, 1]), dtype=self.dtype)
-    self.A = tf.Variable(tf.zeros([self.tag_count, self.tag_count]), dtype=self.dtype)
+    self.w = tf.Variable(
+      tf.truncated_normal([self.tags_count, self.hidden_units], stddev=1.0 / math.sqrt(self.concat_embed_size)),
+      dtype=self.dtype, name='w')
+    self.b = tf.Variable(tf.zeros([self.tag_count, 1]), dtype=self.dtype, name='b')
+    self.A = tf.Variable(tf.random_uniform([self.tag_count, self.tag_count], -1, 1), dtype=self.dtype, name='A')
     self.Ap = tf.placeholder(self.dtype, shape=self.A.get_shape())
-    self.init_A = tf.Variable(tf.zeros([self.tag_count]), dtype=self.dtype)
+    self.init_A = tf.Variable(tf.random_uniform([self.tag_count], -1, 1), dtype=self.dtype, name='init_A')
     self.init_Ap = tf.placeholder(self.dtype, shape=self.init_A.get_shape())
     self.update_A_op = (1 - self.lam) * self.A.assign_add(self.alpha * self.Ap)
     self.update_init_A_op = (1 - self.lam) * self.init_A.assign_add(self.alpha * self.init_Ap)
@@ -49,21 +51,21 @@ class SegLSTM(SegBase):
     self.shape = tf.placeholder(tf.int32, shape=[2])
     self.values = tf.placeholder(self.dtype, shape=[None])
     self.map_matrix_op = tf.sparse_to_dense(self.indices, self.shape, self.values, validate_indices=False)
-    self.map_matrix = tf.placeholder(self.dtype, shape=[self.tag_count, None], name='mm')
+    self.map_matrix = tf.placeholder(self.dtype, shape=[self.tag_count, None])
     self.lstm = tf.contrib.rnn.LSTMCell(self.hidden_units)
     self.lstm_output, self.lstm_out_state = tf.nn.dynamic_rnn(self.lstm, self.x_plus, dtype=self.dtype)
     tf.global_variables_initializer().run(session=self.sess)
     self.word_scores = tf.matmul(self.w, tf.transpose(self.lstm_output[0])) + self.b
     self.loss = tf.reduce_sum(tf.multiply(self.map_matrix, self.word_scores))
     self.lstm_variable = [v for v in tf.global_variables() if v.name.startswith('rnn')]
-    self.params = [self.w, self.b]
-    self.params.extend(self.lstm_variable)
+    self.params = [self.w, self.b] + self.lstm_variable
     self.regularization = list(map(lambda p: tf.assign_sub(p, self.lam * p), self.params))
     self.train = self.optimizer.minimize(self.loss, var_list=self.params)
     self.embedp = tf.placeholder(self.dtype, shape=[None, self.embed_size])
     self.embed_index = tf.placeholder(tf.int32, shape=[None])
     self.update_embed_op = tf.scatter_update(self.embeddings, self.embed_index, self.embedp)
     self.grad_embed = tf.gradients(tf.multiply(self.map_matrix, self.word_scores), self.x_plus)
+    self.saver = tf.train.Saver(self.params + [self.embeddings, self.A, self.init_A], max_to_keep=100)
 
   def model(self, embeds):
     scores = self.sess.run(self.word_scores, feed_dict={self.x_plus: np.expand_dims(embeds.T, 0)})
@@ -71,7 +73,6 @@ class SegLSTM(SegBase):
     return path
 
   def train_exe(self):
-    saver = tf.train.Saver([self.embeddings, self.A, self.init_A].extend(self.params), max_to_keep=100)
     self.sess.graph.finalize()
     last_time = time.time()
     for sentence_index, (sentence, tags) in enumerate(zip(self.words_batch, self.tags_batch)):
@@ -80,7 +81,8 @@ class SegLSTM(SegBase):
         print(sentence_index)
         print(time.time() - last_time)
         last_time = time.time()
-    saver.save(self.sess, 'tmp/lstm-model%d.ckpt' % 0)
+    print(self.sess.run(self.init_A))
+    self.saver.save(self.sess, 'tmp/lstm-model%d.ckpt' % 0)
 
   def train_sentence(self, sentence, tags, length):
     sentence_embeds = self.sess.run(self.lookup_op, feed_dict={self.sentence_holder: sentence}).reshape(
@@ -151,6 +153,22 @@ class SegLSTM(SegBase):
 
     return A_update, init_A_update, update_init
 
+  def seg(self, sentence, model_path='tmp/lstm-model0.ckpt'):
+    # tf.reset_default_graph()
+    self.saver.restore(self.sess, model_path)
+    seq = self.index2seq(self.sentence2index(sentence))
+    sentence_embeds = tf.nn.embedding_lookup(self.embeddings, seq).eval(session=self.sess).reshape(
+      [len(sentence), self.concat_embed_size])
+    sentence_scores = self.sess.run(self.word_scores, feed_dict={self.x_plus: np.expand_dims(sentence_embeds, 0)})
+    init_A_val = self.init_A.eval(session=self.sess)
+    A_val = self.A.eval(session=self.sess)
+    print(self.sess.run(self.w))
+    current_tags = self.viterbi(sentence_scores, A_val, init_A_val)
+    return self.tags2words(sentence, current_tags), current_tags
+
+
 if __name__ == '__main__':
   seg = SegLSTM()
-  seg.train_exe()
+  # seg.train_exe()
+  res = seg.seg('我爱北京天安门')
+  print(seg.seg('小明来自南京师范大学'))
