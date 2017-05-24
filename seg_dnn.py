@@ -52,7 +52,6 @@ class SegDNN:
     self.update_A_op = (1-self.lam)*self.A.assign_add(self.alpha*self.Ap)
     self.update_init_A_op = (1-self.lam)*self.init_A.assign_add(self.alpha*self.init_Ap)
     self.loss = -tf.reduce_sum(tf.multiply(self.map_matrix, self.word_score))
-    self.params_regularization = list(map(lambda p:tf.assign_sub(p,(1-self.lam)*p),self.params))
     self.grad_embed = tf.gradients(tf.multiply(self.map_matrix, self.word_score), self.x)
     self.update_embed = self.alpha * (self.grad_embed[0]) + (1 - self.lam) * self.x
     self.train_loss = self.optimizer.minimize(self.loss, var_list=self.params)
