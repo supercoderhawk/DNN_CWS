@@ -13,30 +13,35 @@ class SegLSTM(SegBase):
   def __init__(self):
     SegBase.__init__(self)
     self.dtype = tf.float32
+    # 参数初始化
     self.skip_window_left = constant.LSTM_SKIP_WINDOW_LEFT
     self.skip_window_right = constant.LSTM_SKIP_WINDOW_RIGHT
     self.window_size = self.skip_window_left + self.skip_window_right + 1
-    self.embed_size = 50
-    self.hidden_units = 100
+    self.embed_size = 100
+    self.hidden_units = 150
     self.tag_count = 4
     self.concat_embed_size = self.window_size * self.embed_size
+    self.vocab_size = constant.VOCAB_SIZE
+    self.alpha = 0.05
+    self.lam = 0.0005
+    self.eta = 0.02
+    self.dropout_rate = 0.2
+    # 数据初始化
     trans = TransformDataLSTM()
     self.words_batch = trans.words_batch
     self.tags_batch = trans.labels_batch
     self.dictionary = trans.dictionary
-    self.vocab_size = constant.VOCAB_SIZE
-    self.alpha = 0.02
-    self.lam = 0.001
+    # 模型定义和初始化
     self.sess = tf.Session()
     self.optimizer = tf.train.GradientDescentOptimizer(self.alpha)
     self.x = tf.placeholder(self.dtype, shape=[self.concat_embed_size, None])
     self.x_plus = tf.placeholder(self.dtype, shape=[1, None, self.concat_embed_size])
     self.embeddings = tf.Variable(
-      tf.random_uniform([self.vocab_size, self.embed_size], -1.0 / math.sqrt(self.embed_size),
-                        1.0 / math.sqrt(self.embed_size),
+      tf.random_uniform([self.vocab_size, self.embed_size], -8.0 / math.sqrt(self.embed_size),
+                        8.0 / math.sqrt(self.embed_size),
                         dtype=self.dtype), dtype=self.dtype, name='embeddings')
     self.w = tf.Variable(
-      tf.truncated_normal([self.tags_count, self.hidden_units], stddev=1.0 / math.sqrt(self.concat_embed_size)),
+      tf.truncated_normal([self.tags_count, self.hidden_units], stddev=5.0 / math.sqrt(self.concat_embed_size)),
       dtype=self.dtype, name='w')
     self.b = tf.Variable(tf.zeros([self.tag_count, 1]), dtype=self.dtype, name='b')
     self.A = tf.Variable(tf.random_uniform([self.tag_count, self.tag_count], -1, 1), dtype=self.dtype, name='A')
@@ -55,7 +60,7 @@ class SegLSTM(SegBase):
     self.lstm = tf.contrib.rnn.LSTMCell(self.hidden_units)
     self.lstm_output, self.lstm_out_state = tf.nn.dynamic_rnn(self.lstm, self.x_plus, dtype=self.dtype)
     tf.global_variables_initializer().run(session=self.sess)
-    self.word_scores = tf.matmul(self.w, tf.transpose(self.lstm_output[0])) + self.b
+    self.word_scores = tf.nn.relu(tf.matmul(self.w, tf.transpose(self.lstm_output[0])) + self.b)
     self.loss = tf.reduce_sum(tf.multiply(self.map_matrix, self.word_scores))
     self.lstm_variable = [v for v in tf.global_variables() if v.name.startswith('rnn')]
     self.params = [self.w, self.b] + self.lstm_variable
@@ -66,6 +71,8 @@ class SegLSTM(SegBase):
     self.update_embed_op = tf.scatter_update(self.embeddings, self.embed_index, self.embedp)
     self.grad_embed = tf.gradients(tf.multiply(self.map_matrix, self.word_scores), self.x_plus)
     self.saver = tf.train.Saver(self.params + [self.embeddings, self.A, self.init_A], max_to_keep=100)
+    self.regu = tf.contrib.layers.apply_regularization(tf.contrib.layers.l2_regularizer(self.lam),
+                                                       self.params + [self.A, self.init_A])
 
   def model(self, embeds):
     scores = self.sess.run(self.word_scores, feed_dict={self.x_plus: np.expand_dims(embeds.T, 0)})
@@ -75,14 +82,15 @@ class SegLSTM(SegBase):
   def train_exe(self):
     self.sess.graph.finalize()
     last_time = time.time()
-    for sentence_index, (sentence, tags) in enumerate(zip(self.words_batch, self.tags_batch)):
-      self.train_sentence(sentence, tags, len(tags))
-      if sentence_index % 500 == 0:
-        print(sentence_index)
-        print(time.time() - last_time)
-        last_time = time.time()
-    print(self.sess.run(self.init_A))
-    self.saver.save(self.sess, 'tmp/lstm-model%d.ckpt' % 0)
+    for i in range(3):
+      for sentence_index, (sentence, tags) in enumerate(zip(self.words_batch, self.tags_batch)):
+        self.train_sentence(sentence, tags, len(tags))
+        if sentence_index % 500 == 0:
+          print(sentence_index)
+          print(time.time() - last_time)
+          last_time = time.time()
+      print(self.sess.run(self.init_A))
+      self.saver.save(self.sess, 'tmp/lstm-model%d.ckpt' % i)
 
   def train_sentence(self, sentence, tags, length):
     sentence_embeds = self.sess.run(self.lookup_op, feed_dict={self.sentence_holder: sentence}).reshape(
@@ -108,6 +116,7 @@ class SegLSTM(SegBase):
                                     feed_dict={self.indices: sparse_indices, self.shape: output_shape,
                                                self.values: sparse_values})
     # 更新参数
+    # self.sess.run(self.regu)
     self.sess.run(self.train,
                   feed_dict={self.x_plus: np.expand_dims(update_embed.T, 0), self.map_matrix: sentence_matrix})
     self.sess.run(self.regularization)
@@ -119,7 +128,7 @@ class SegLSTM(SegBase):
       grad = self.sess.run(self.grad_embed, feed_dict={self.x_plus: embed,
                                                        self.map_matrix: np.expand_dims(sentence_matrix[:, i], 1)})[0]
 
-      sentence_update_embed = (embed + self.alpha * grad) * (1 - self.lam)
+      sentence_update_embed = (embed - self.alpha * grad) * (1 - self.lam)
       self.embeddings = self.sess.run(self.update_embed_op,
                                       feed_dict={
                                         self.embedp: sentence_update_embed.reshape([self.window_size, self.embed_size]),
@@ -153,8 +162,7 @@ class SegLSTM(SegBase):
 
     return A_update, init_A_update, update_init
 
-  def seg(self, sentence, model_path='tmp/lstm-model0.ckpt'):
-    # tf.reset_default_graph()
+  def seg(self, sentence, model_path='tmp/lstm-model1.ckpt'):
     self.saver.restore(self.sess, model_path)
     seq = self.index2seq(self.sentence2index(sentence))
     sentence_embeds = tf.nn.embedding_lookup(self.embeddings, seq).eval(session=self.sess).reshape(
@@ -162,7 +170,7 @@ class SegLSTM(SegBase):
     sentence_scores = self.sess.run(self.word_scores, feed_dict={self.x_plus: np.expand_dims(sentence_embeds, 0)})
     init_A_val = self.init_A.eval(session=self.sess)
     A_val = self.A.eval(session=self.sess)
-    print(self.sess.run(self.w))
+    print(A_val)
     current_tags = self.viterbi(sentence_scores, A_val, init_A_val)
     return self.tags2words(sentence, current_tags), current_tags
 
@@ -170,5 +178,6 @@ class SegLSTM(SegBase):
 if __name__ == '__main__':
   seg = SegLSTM()
   # seg.train_exe()
-  res = seg.seg('我爱北京天安门')
+  print(seg.seg('我爱北京天安门'))
   print(seg.seg('小明来自南京师范大学'))
+  print(seg.seg('小明是上海理工大学的学生'))
