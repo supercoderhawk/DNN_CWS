@@ -18,8 +18,9 @@ class TransformDataLSTM(TransformData):
       if os.path.exists(self.words_batch_base_path+'.npy') and os.path.exists(self.labels_batch_base_path+'.npy'):
         self.words_batch = np.load(self.words_batch_path)
         self.labels_batch = np.load(self.labels_batch_path)
-    else:
-      self.words_batch, self.labels_batch = self.generate_sentences_batch()
+        return
+
+    self.words_batch, self.labels_batch = self.generate_sentences_batch()
 
   def generate_sentences_batch(self):
     words_batch = []
@@ -42,11 +43,10 @@ class TransformDataLSTM(TransformData):
   def generate_exe(self):
     np.save(self.words_batch_base_path,self.words_batch)
     np.save(self.labels_batch_base_path,self.labels_batch)
-    print(self.words_batch[1])
 
   def generate_batch(self):
     pass
 
 if __name__ == '__main__':
-  trans = TransformDataLSTM()
+  trans = TransformDataLSTM(True)
   trans.generate_exe()
