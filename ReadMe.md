@@ -32,15 +32,16 @@ print(cws.seg('我爱北京天安门')[0])
 
 ## 相关代码文件说明
 
-* [`seg_dnn.py`](https://github.com/supercoderhawk/DNN_CWS/blob/master/seg_dnn.py): 使用（感知机式）神经网络进行中文分词
+* [`seg_dnn.py`](https://github.com/supercoderhawk/DNN_CWS/blob/master/seg_dnn.py): 使用（感知机式）神经网络进行中文分词，对应论文1
+* [`seg_lstm.py`](https://github.com/supercoderhawk/DNN_CWS/blob/master/seg_lstm.py): 使用LSTM神经网络进行中文分词，对应论文2
 * [`prepare_data.py`](https://github.com/supercoderhawk/DNN_CWS/blob/master/prepare_data.py): 预处理语料库，包括msr和pku
 * [`init.py`](https://github.com/supercoderhawk/DNN_CWS/blob/master/init.py): 用于生成进行训练和测试的数据的脚本文件
 
 ## 参考论文：
 
-* [deep learning for chinese word segmentation and pos tagging](www.aclweb.org/anthology/D13-1061) （已完全实现）
+* [deep learning for chinese word segmentation and pos tagging](www.aclweb.org/anthology/D13-1061) （已完全实现，文件`seg_dnn.py`）
+* [Long Short-Term Memory Neural Networks for Chinese Word Segmentation](http://www.emnlp2015.org/proceedings/EMNLP/pdf/EMNLP141.pdf) (基本实现，正在改进，文件`seg_lstm.py`)
 * [Max-Margin Tensor Neural Network for Chinese Word Segmentation](www.aclweb.org/anthology/P14-1028) （正在实现）
-* [Long Short-Term Memory Neural Networks for Chinese Word Segmentation](http://www.emnlp2015.org/proceedings/EMNLP/pdf/EMNLP141.pdf) (正在实现)
 ## Todo List
 
 - [ ] 支持`pip`
