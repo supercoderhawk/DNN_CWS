@@ -27,21 +27,23 @@ class SegDNN:
     self.x = tf.placeholder(tf.float64, shape=[self.concat_embed_size, None], name='x')
     self.map_matrix = tf.placeholder(tf.float64, shape=[4, None], name='mm')
     self.embeddings = tf.Variable(
-      tf.random_uniform([self.vocab_size, self.embed_size], -1.0 / math.sqrt(self.embed_size), 1.0 / math.sqrt(self.embed_size),
+      tf.random_uniform([self.vocab_size, self.embed_size], -1.0 / math.sqrt(self.embed_size),
+                        1.0 / math.sqrt(self.embed_size),
                         dtype=tf.float64), dtype=tf.float64, name='embeddings')
     self.w2 = tf.Variable(
-        tf.random_uniform([self.h, self.concat_embed_size], -4.0/math.sqrt(self.concat_embed_size),4/math.sqrt(self.concat_embed_size),
-                            dtype=tf.float64), dtype=tf.float64, name='w2')
+      tf.random_uniform([self.h, self.concat_embed_size], -4.0 / math.sqrt(self.concat_embed_size),
+                        4 / math.sqrt(self.concat_embed_size),
+                        dtype=tf.float64), dtype=tf.float64, name='w2')
     self.b2 = tf.Variable(tf.zeros([self.h, 1], dtype=tf.float64), dtype=tf.float64, name='b2')
 
     self.w3 = tf.Variable(
-      tf.random_uniform([self.tags_count, self.h], -4.0/math.sqrt(self.h), 4.0 / math.sqrt(self.h), dtype=tf.float64),
+      tf.random_uniform([self.tags_count, self.h], -4.0 / math.sqrt(self.h), 4.0 / math.sqrt(self.h), dtype=tf.float64),
       dtype=tf.float64, name='w3')
     self.b3 = tf.Variable(tf.zeros([self.tags_count, 1], dtype=tf.float64), dtype=tf.float64, name='b3')
     self.word_score = tf.add(tf.matmul(self.w3, tf.sigmoid(tf.add(tf.matmul(self.w2, self.x), self.b2))), self.b3)
     self.params = [self.w2, self.b2, self.w3, self.b3]
-    self.A = tf.Variable(tf.random_uniform([4, 4], -1, 1,dtype=tf.float64), dtype=tf.float64, name='A')
-    self.init_A = tf.Variable(tf.random_uniform([4], -1, 1,dtype=tf.float64), dtype=tf.float64, name='init_A')
+    self.A = tf.Variable(tf.random_uniform([4, 4], -1, 1, dtype=tf.float64), dtype=tf.float64, name='A')
+    self.init_A = tf.Variable(tf.random_uniform([4], -1, 1, dtype=tf.float64), dtype=tf.float64, name='init_A')
     self.Ap = tf.placeholder(tf.float64, shape=self.A.get_shape())
     self.init_Ap = tf.placeholder(tf.float64, shape=self.init_A.get_shape())
     self.embedp = tf.placeholder(tf.float64, shape=[None, self.embed_size])
@@ -49,8 +51,8 @@ class SegDNN:
     self.update_embed_op = tf.scatter_update(self.embeddings, self.embed_index, self.embedp)
     self.lam = 0.0001
     self.optimizer = tf.train.GradientDescentOptimizer(self.alpha)
-    self.update_A_op = (1-self.lam)*self.A.assign_add(self.alpha*self.Ap)
-    self.update_init_A_op = (1-self.lam)*self.init_A.assign_add(self.alpha*self.init_Ap)
+    self.update_A_op = (1 - self.lam) * self.A.assign_add(self.alpha * self.Ap)
+    self.update_init_A_op = (1 - self.lam) * self.init_A.assign_add(self.alpha * self.init_Ap)
     self.loss = -tf.reduce_sum(tf.multiply(self.map_matrix, self.word_score))
     self.grad_embed = tf.gradients(tf.multiply(self.map_matrix, self.word_score), self.x)
     self.update_embed = self.alpha * (self.grad_embed[0]) + (1 - self.lam) * self.x
@@ -61,6 +63,7 @@ class SegDNN:
     self.gen_map = tf.sparse_to_dense(self.indices, self.shape, self.values, validate_indices=False)
     self.sentence_holder = tf.placeholder(tf.int32, shape=[None, self.window_length])
     self.lookup_op = tf.nn.embedding_lookup(self.embeddings, self.sentence_holder)
+    self.params_regularization = list(map(lambda p: tf.assign_sub(p, self.lam * p), self.params))
     self.line_index = np.arange(4, dtype=np.int32)
     self.sentence_index = 0
 
@@ -76,7 +79,8 @@ class SegDNN:
     print('start...')
 
     self.sess = tf.Session()
-    saver = tf.train.Saver([self.embeddings, self.A].extend(self.params), max_to_keep=100)
+    params = [self.embeddings, self.A, self.init_A].extend(self.params)
+    saver = tf.train.Saver(params, max_to_keep=100)
     train_writer = tf.summary.FileWriter('logs', self.sess.graph)
     init = tf.global_variables_initializer()
     init.run(session=self.sess)
@@ -101,7 +105,6 @@ class SegDNN:
     start = time.time()
     time_all = 0.0
     start_c = 0
-    print(self.w3.eval(session=self.sess))
     for sentence_index, (sentence, tags) in enumerate(zip(self.words_batch, self.tags_batch)):
       self.sentence_index = sentence_index
       start_s = time.time()
@@ -300,36 +303,37 @@ class SegDNN:
 
     return words
 
-  def seg(self, sentence, model_path='model/model.ckpt',debug=False):
+  def seg(self, sentence, model_path='model/model.ckpt', debug=False):
     dtype = tf.float64
     tf.reset_default_graph()
     x = tf.placeholder(dtype, shape=[self.concat_embed_size, None], name='x')
-    #embeddings = tf.Variable(tf.random_uniform([self.vocab_size, self.embed_size], -1.0, 1.0, dtype=tf.float64),
+    # embeddings = tf.Variable(tf.random_uniform([self.vocab_size, self.embed_size], -1.0, 1.0, dtype=tf.float64),
     #                         tf.float64, name='embeddings')
     embeddings = tf.Variable(np.load('data/dnn/embeddings.npy'), dtype, name='embeddings')
-    #w2 = tf.Variable(
+    # w2 = tf.Variable(
     #  tf.truncated_normal([self.h, self.concat_embed_size], stddev=1.0 / math.sqrt(self.concat_embed_size),
     #                      dtype=tf.float64), dtype=tf.float64, name='w2')
     w2 = tf.Variable(np.load('data/dnn/w2.npy'), dtype, name='w2')
-    #b2 = tf.Variable(tf.zeros([self.h, 1], dtype=tf.float64), dtype=tf.float64, name='b2')
+    # b2 = tf.Variable(tf.zeros([self.h, 1], dtype=tf.float64), dtype=tf.float64, name='b2')
     b2 = tf.Variable(np.load('data/dnn/b2.npy'), dtype, name='b2')
-    #w3 = tf.Variable(
+    # w3 = tf.Variable(
     #  tf.truncated_normal([self.tags_count, self.h], stddev=1.0 / math.sqrt(self.concat_embed_size), dtype=tf.float64),
     #  dtype=tf.float64, name='w3')
     w3 = tf.Variable(np.load('data/dnn/w3.npy'), dtype, name='w3')
-    #b3 = tf.Variable(tf.zeros([self.tags_count, 1], dtype=tf.float64), dtype=tf.float64, name='b3')
+    # b3 = tf.Variable(tf.zeros([self.tags_count, 1], dtype=tf.float64), dtype=tf.float64, name='b3')
     b3 = tf.Variable(np.load('data/dnn/b3.npy'), dtype, name='b3')
     word_score = tf.matmul(w3, tf.sigmoid(tf.matmul(w2, x) + b2)) + b3
-    #A = tf.Variable(
+    # A = tf.Variable(
     #  [[1, 1, 0, 0], [0, 0, 1, 1], [0, 0, 1, 1], [1, 1, 0, 0]], dtype=tf.float64, name='A')
     A = tf.Variable(np.load('data/dnn/A.npy'), dtype, name='A')
-    #init_A = tf.Variable([1, 1, 0, 0], dtype=tf.float64, name='init_A')
+    # init_A = tf.Variable([1, 1, 0, 0], dtype=tf.float64, name='init_A')
     init_A = tf.Variable(np.load('data/dnn/init_A.npy'), dtype, name='init_A')
-    saver = tf.train.Saver()
+    params = [embeddings, A, init_A, w2, w3, b2, b3]
+    saver = tf.train.Saver(var_list=params)
     with tf.Session() as sess:
       saver.restore(sess, model_path)
-      #tf.global_variables_initializer().run()
-      #saver.save(sess,'model/model.ckpt')
+      # tf.global_variables_initializer().run()
+      # saver.save(sess,'model/model.ckpt')
       seq = self.index2seq(self.sentence2index(sentence))
       sentence_embeds = tf.nn.embedding_lookup(embeddings, seq).eval().reshape(
         [len(sentence), self.concat_embed_size]).T
@@ -357,7 +361,8 @@ class SegDNN:
           file.write(' '.join(v) + '\n')
         file.close()
 
-      return self.tags2words(sentence, current_tags),current_tags
+      return self.tags2words(sentence, current_tags), current_tags
+
 
 if __name__ == '__main__':
   embed_size = 50
