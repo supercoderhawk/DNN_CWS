@@ -1,12 +1,13 @@
 # -*- coding: UTF-8 -*-
-import tensorflow as tf
-import numpy as np
 import math
 import time
 
+import numpy as np
+import tensorflow as tf
+
 import constant
-from transform_data_lstm import TransformDataLSTM
 from seg_base import SegBase
+from transform_data_lstm import TransformDataLSTM
 
 
 class SegLSTM(SegBase):
@@ -68,9 +69,9 @@ class SegLSTM(SegBase):
     self.embedp = tf.placeholder(self.dtype, shape=[None, self.embed_size])
     self.embed_index = tf.placeholder(tf.int32, shape=[None])
     self.update_embed_op = tf.scatter_update(self.embeddings, self.embed_index, self.embedp)
-    self.sentence_length = 1 #tf.placeholder(tf.int32, shape=[1])
+    self.sentence_length = 1  # tf.placeholder(tf.int32, shape=[1])
     self.grad_embed = tf.gradients(tf.split(self.loss_scores, self.sentence_length),
-                                   tf.split(self.x, self.sentence_length,1))
+                                   tf.split(self.x, self.sentence_length, 1))
     self.saver = tf.train.Saver(self.params + [self.embeddings, self.A, self.init_A], max_to_keep=100)
     self.regu = tf.contrib.layers.apply_regularization(tf.contrib.layers.l2_regularizer(self.lam),
                                                        self.params + [self.A, self.init_A])
@@ -81,7 +82,7 @@ class SegLSTM(SegBase):
     return path
 
   def train_exe(self):
-    #self.sess.graph.finalize()
+    # self.sess.graph.finalize()
     last_time = time.time()
     for i in range(10):
       for sentence_index, (sentence, tags) in enumerate(zip(self.words_batch, self.tags_batch)):
@@ -116,7 +117,7 @@ class SegLSTM(SegBase):
     sentence_matrix = self.sess.run(self.map_matrix_op,
                                     feed_dict={self.indices: sparse_indices, self.shape: output_shape,
                                                self.values: sparse_values})
-    #print(sentence_matrix)
+    # print(sentence_matrix)
     # 更新参数
     # self.sess.run(self.regu)
     self.sess.run(self.train,
@@ -124,11 +125,11 @@ class SegLSTM(SegBase):
     self.sess.run(self.regularization)
 
     # 更新词向量
-    #sen_len = np.asarray(length,dtype=np.int32).reshape([1])
+    # sen_len = np.asarray(length,dtype=np.int32).reshape([1])
     self.sentence_length = length
-    #print(tf.split(np.expand_dims(sentence_embeds,0), self.sentence_length,1))
+    # print(tf.split(np.expand_dims(sentence_embeds,0), self.sentence_length,1))
     g = tf.gradients(tf.split(self.loss_scores, self.sentence_length),
-                 tf.split(self.x, self.sentence_length, 1))
+                     tf.split(self.x, self.sentence_length, 1))
     grads = self.sess.run(self.grad_embed,
                           feed_dict={self.x: np.expand_dims(sentence_embeds, 0), self.map_matrix: sentence_matrix})
 
@@ -190,6 +191,3 @@ class SegLSTM(SegBase):
 if __name__ == '__main__':
   seg = SegLSTM()
   seg.train_exe()
-  # print(seg.seg('我爱北京天安门'))
-  # print(seg.seg('小明来自南京师范大学'))
-  # print(seg.seg('小明是上海理工大学的学生'))
