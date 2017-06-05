@@ -135,7 +135,7 @@ class PrepareData:
     labels_file.close()
     if self.output_raw_file:
       self.build_raw_corpus()
-    self.build_test_corpus('data/test.utf8')
+    #self.build_test_corpus('data/test.utf8')
 
 
 if __name__ == '__main__':
