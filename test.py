@@ -31,7 +31,7 @@ def test_seg_dnn():
   #print(seg.seg('小明来自南京师范大学'))
   #print(seg.seg('小明是上海理工大学的学生'))
   print(seg.seg('小明来自南京师范大学'))
-  test(seg,'tmp/lstm-model1.ckpt')
+  test(seg,'tmp/lstm-model9.ckpt')
   # print(seq)
   # cal_val(seq)
   # print(cws.seg('2015世界旅游小姐大赛山东赛区冠军总决赛在威海举行',model))
