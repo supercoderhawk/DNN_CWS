@@ -23,7 +23,7 @@ class SegLSTM(SegBase):
     self.tag_count = 4
     self.concat_embed_size = self.window_size * self.embed_size
     self.vocab_size = constant.VOCAB_SIZE
-    self.alpha = 0.2
+    self.alpha = 0.02
     self.lam = 0.0001
     self.eta = 0.02
     self.dropout_rate = 0.2
@@ -40,15 +40,18 @@ class SegLSTM(SegBase):
       tf.truncated_normal([self.vocab_size, self.embed_size], stddev=-1.0 / math.sqrt(self.embed_size),
                           dtype=self.dtype), dtype=self.dtype, name='embeddings')
     self.w = tf.Variable(
-      tf.truncated_normal([self.tags_count, self.hidden_units], stddev=1.0 / math.sqrt(self.concat_embed_size)),
+      tf.truncated_normal([self.tags_count, self.hidden_units], stddev=1.0 / math.sqrt(self.concat_embed_size),
+                          dtype=self.dtype),
       dtype=self.dtype, name='w')
-    self.b = tf.Variable(tf.zeros([self.tag_count, 1]), dtype=self.dtype, name='b')
-    self.A = tf.Variable(tf.random_uniform([self.tag_count, self.tag_count], -0.05, 0.05), dtype=self.dtype, name='A')
+    self.b = tf.Variable(tf.zeros([self.tag_count, 1], dtype=self.dtype), dtype=self.dtype, name='b')
+    self.A = tf.Variable(tf.random_uniform([self.tag_count, self.tag_count], -0.05, 0.05, dtype=self.dtype),
+                         dtype=self.dtype, name='A')
     self.Ap = tf.placeholder(self.dtype, shape=self.A.get_shape())
-    self.init_A = tf.Variable(tf.random_uniform([self.tag_count], -0.05, 0.05), dtype=self.dtype, name='init_A')
+    self.init_A = tf.Variable(tf.random_uniform([self.tag_count], -0.05, 0.05, dtype=self.dtype), dtype=self.dtype,
+                              name='init_A')
     self.init_Ap = tf.placeholder(self.dtype, shape=self.init_A.get_shape())
-    self.update_A_op = (1 - self.lam) * self.A.assign_add(self.alpha * self.Ap)
-    self.update_init_A_op = (1 - self.lam) * self.init_A.assign_add(self.alpha * self.init_Ap)
+    self.update_A_op = self.A.assign((1 - self.lam) * (tf.add(self.A, self.alpha * self.Ap)))
+    self.update_init_A_op = self.init_A.assign((1 - self.lam) * (tf.add(self.init_A, self.alpha * self.init_Ap)))
     self.sentence_holder = tf.placeholder(tf.int32, shape=[None, self.window_size])
     self.lookup_op = tf.nn.embedding_lookup(self.embeddings, self.sentence_holder)
     self.indices = tf.placeholder(tf.int32, shape=[None, 2])
@@ -69,8 +72,9 @@ class SegLSTM(SegBase):
     self.embedp = tf.placeholder(self.dtype, shape=[None, self.embed_size])
     self.embed_index = tf.placeholder(tf.int32, shape=[None])
     self.update_embed_op = tf.scatter_update(self.embeddings, self.embed_index, self.embedp)
-    self.sentence_length = 1  # tf.placeholder(tf.int32, shape=[1])
-    self.grad_embed = tf.gradients(self.loss_scores, self.x)
+    self.sentence_length = 1
+    self.sentence_index = 0
+    self.grad_embed = tf.gradients(self.loss_scores[:, self.sentence_index], self.x)
     self.saver = tf.train.Saver(self.params + [self.embeddings, self.A, self.init_A], max_to_keep=100)
 
   def model(self, embeds):
@@ -107,7 +111,6 @@ class SegLSTM(SegBase):
 
     sparse_indices = np.stack(
       [np.concatenate([update_tags_pos, update_tags_neg], axis=-1), np.tile(update_index, [2])], axis=-1)
-
     sparse_values = np.concatenate([-1 * np.ones(update_length), np.ones(update_length)])
     output_shape = [self.tag_count, length]
     sentence_matrix = self.sess.run(self.map_matrix_op,
@@ -121,29 +124,18 @@ class SegLSTM(SegBase):
 
     # 更新词向量
     self.sentence_length = length
-    grads = self.sess.run(self.grad_embed,
-                          feed_dict={self.x: np.expand_dims(sentence_embeds, 0),
-                                     self.map_matrix: sentence_matrix})[0][0]
 
     for _, index in enumerate(update_index):
-      sentence_update_embed = (sentence_embeds[index] - self.alpha * grads[index]) * (1 - self.lam)
+      self.sentence_index = index
+      grad = self.sess.run(self.grad_embed,
+                           feed_dict={self.x: np.expand_dims(np.expand_dims(sentence_embeds[index], 0), 0),
+                                      self.map_matrix: sentence_matrix})[0][0]
+      sentence_update_embed = (sentence_embeds[index] - self.alpha * grad) * (1 - self.lam)
       self.embeddings = self.sess.run(self.update_embed_op,
                                       feed_dict={
                                         self.embedp: sentence_update_embed.reshape([self.window_size, self.embed_size]),
                                         self.embed_index: sentence[index]})
-    '''
-    embed_index = sentence[update_index]
-    for i in range(update_length):
-      embed = np.expand_dims(np.expand_dims(update_embed[:, i], 0), 0)
-      grad = self.sess.run(self.grad_embed, feed_dict={self.x: embed,
-                                                       self.map_matrix: np.expand_dims(sentence_matrix[:, i], 1)})[0]
 
-      sentence_update_embed = (embed - self.alpha * grad) * (1 - self.lam)
-      self.embeddings = self.sess.run(self.update_embed_op,
-                                      feed_dict={
-                                        self.embedp: sentence_update_embed.reshape([self.window_size, self.embed_size]),
-                                        self.embed_index: embed_index[i, :]})
-    '''
     # 更新转移矩阵
     A_update, init_A_update, update_init = self.gen_update_A(tags, current_tags)
     if update_init:
@@ -172,7 +164,7 @@ class SegLSTM(SegBase):
 
     return A_update, init_A_update, update_init
 
-  def seg(self, sentence, model_path='tmp/lstm-model2.ckpt'):
+  def seg(self, sentence, model_path='tmp/lstm-model0.ckpt'):
     self.saver.restore(self.sess, model_path)
     seq = self.index2seq(self.sentence2index(sentence))
     sentence_embeds = tf.nn.embedding_lookup(self.embeddings, seq).eval(session=self.sess).reshape(
@@ -180,7 +172,7 @@ class SegLSTM(SegBase):
     sentence_scores = self.sess.run(self.word_scores, feed_dict={self.x: np.expand_dims(sentence_embeds, 0)})
     init_A_val = self.init_A.eval(session=self.sess)
     A_val = self.A.eval(session=self.sess)
-    print(A_val)
+    # print(A_val)
     current_tags = self.viterbi(sentence_scores, A_val, init_A_val)
     return self.tags2words(sentence, current_tags), current_tags
 
