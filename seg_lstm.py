@@ -23,8 +23,8 @@ class SegLSTM(SegBase):
     self.tag_count = 4
     self.concat_embed_size = self.window_size * self.embed_size
     self.vocab_size = constant.VOCAB_SIZE
-    self.alpha = 0.02
-    self.lam = 0.001
+    self.alpha = 0.2
+    self.lam = 0.0001
     self.eta = 0.02
     self.dropout_rate = 0.2
     # 数据初始化
@@ -70,11 +70,8 @@ class SegLSTM(SegBase):
     self.embed_index = tf.placeholder(tf.int32, shape=[None])
     self.update_embed_op = tf.scatter_update(self.embeddings, self.embed_index, self.embedp)
     self.sentence_length = 1  # tf.placeholder(tf.int32, shape=[1])
-    self.grad_embed = tf.gradients(tf.split(self.loss_scores, self.sentence_length),
-                                   tf.split(self.x, self.sentence_length, 1))
+    self.grad_embed = tf.gradients(self.loss_scores, self.x)
     self.saver = tf.train.Saver(self.params + [self.embeddings, self.A, self.init_A], max_to_keep=100)
-    self.regu = tf.contrib.layers.apply_regularization(tf.contrib.layers.l2_regularizer(self.lam),
-                                                       self.params + [self.A, self.init_A])
 
   def model(self, embeds):
     scores = self.sess.run(self.word_scores, feed_dict={self.x: np.expand_dims(embeds, 0)})
@@ -82,7 +79,7 @@ class SegLSTM(SegBase):
     return path
 
   def train_exe(self):
-    # self.sess.graph.finalize()
+    self.sess.graph.finalize()
     last_time = time.time()
     for i in range(10):
       for sentence_index, (sentence, tags) in enumerate(zip(self.words_batch, self.tags_batch)):
@@ -108,7 +105,6 @@ class SegLSTM(SegBase):
     update_tags_pos = tags[update_index]
     update_tags_neg = current_tags[update_index]
 
-    # update_embed = sentence_embeds[update_index]
     sparse_indices = np.stack(
       [np.concatenate([update_tags_pos, update_tags_neg], axis=-1), np.tile(update_index, [2])], axis=-1)
 
@@ -117,23 +113,24 @@ class SegLSTM(SegBase):
     sentence_matrix = self.sess.run(self.map_matrix_op,
                                     feed_dict={self.indices: sparse_indices, self.shape: output_shape,
                                                self.values: sparse_values})
-    # print(sentence_matrix)
+
     # 更新参数
-    # self.sess.run(self.regu)
     self.sess.run(self.train,
                   feed_dict={self.x: np.expand_dims(sentence_embeds, 0), self.map_matrix: sentence_matrix})
     self.sess.run(self.regularization)
 
     # 更新词向量
-    # sen_len = np.asarray(length,dtype=np.int32).reshape([1])
     self.sentence_length = length
-    # print(tf.split(np.expand_dims(sentence_embeds,0), self.sentence_length,1))
-    g = tf.gradients(tf.split(self.loss_scores, self.sentence_length),
-                     tf.split(self.x, self.sentence_length, 1))
     grads = self.sess.run(self.grad_embed,
-                          feed_dict={self.x: np.expand_dims(sentence_embeds, 0), self.map_matrix: sentence_matrix})
+                          feed_dict={self.x: np.expand_dims(sentence_embeds, 0),
+                                     self.map_matrix: sentence_matrix})[0][0]
 
-    print(grads.shape)
+    for _, index in enumerate(update_index):
+      sentence_update_embed = (sentence_embeds[index] - self.alpha * grads[index]) * (1 - self.lam)
+      self.embeddings = self.sess.run(self.update_embed_op,
+                                      feed_dict={
+                                        self.embedp: sentence_update_embed.reshape([self.window_size, self.embed_size]),
+                                        self.embed_index: sentence[index]})
     '''
     embed_index = sentence[update_index]
     for i in range(update_length):
@@ -183,7 +180,7 @@ class SegLSTM(SegBase):
     sentence_scores = self.sess.run(self.word_scores, feed_dict={self.x: np.expand_dims(sentence_embeds, 0)})
     init_A_val = self.init_A.eval(session=self.sess)
     A_val = self.A.eval(session=self.sess)
-    # print(A_val)
+    print(A_val)
     current_tags = self.viterbi(sentence_scores, A_val, init_A_val)
     return self.tags2words(sentence, current_tags), current_tags
 
