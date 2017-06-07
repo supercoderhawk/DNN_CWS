@@ -1,12 +1,14 @@
 # -*- coding: UTF-8 -*-
 import collections
 import re
-from utils import strQ2B
+
 import constant
+from utils import strQ2B
 
 
 class PrepareData:
-  def __init__(self, vocab_size, input_file, output_words_file, output_labels_file, dict_file, raw_file,input_dict=False):
+  def __init__(self, vocab_size, input_file, output_words_file, output_labels_file, dict_file, raw_file,
+               input_dict=False):
     """
     构造函数
     :param vocab_size: 词汇表的大小
@@ -53,9 +55,9 @@ class PrepareData:
     return sentences
 
   def build_raw_corpus(self):
-    file = open(self.raw_file,'w',encoding='utf-8')
+    file = open(self.raw_file, 'w', encoding='utf-8')
     for sentence in self.sentences:
-      file.write(sentence.replace(' ','')+'\n')
+      file.write(sentence.replace(' ', '') + '\n')
     file.close()
 
   def build_dictionary(self):
@@ -111,11 +113,12 @@ class PrepareData:
           sentence_label.extend([2] * (l - 2))
           sentence_label.append(3)
       self.labels_index.append(sentence_label)
-  def build_test_corpus(self,filename):
-    with open(filename,'w',encoding='utf-8') as file:
-      for _,(sentence,sentence_label) in enumerate(zip(self.sentences,self.labels_index)):
-        file.write(sentence.replace(' ','')+'\n')
-        file.write(' '.join(map(lambda i:str(i),sentence_label))+'\n')
+
+  def build_test_corpus(self, filename):
+    with open(filename, 'w', encoding='utf-8') as file:
+      for _, (sentence, sentence_label) in enumerate(zip(self.sentences, self.labels_index)):
+        file.write(sentence.replace(' ', '') + '\n')
+        file.write(' '.join(map(lambda i: str(i), sentence_label)) + '\n')
 
   def build_exec(self):
     self.build_basic_dataset()
@@ -135,12 +138,13 @@ class PrepareData:
     labels_file.close()
     if self.output_raw_file:
       self.build_raw_corpus()
-    #self.build_test_corpus('data/test.utf8')
+    #self.build_test_corpus('tmp/test.utf8')
 
 
 if __name__ == '__main__':
   prepare_pku = PrepareData(constant.VOCAB_SIZE, 'corpus/pku_training.utf8', 'corpus/pku_training_words.txt',
-                            'corpus/pku_training_labels.txt', 'corpus/pku_training_dict.txt','corpus/pku_training_raw.utf8')
+                            'corpus/pku_training_labels.txt', 'corpus/pku_training_dict.txt',
+                            'corpus/pku_training_raw.utf8')
   prepare_pku.build_exec()
   # prepare_msr = PrepareData(constant.VOCAB_SIZE,'corpus/msr_training.utf8', 'corpus/msr_training_words.txt',
   #                           'corpus/msr_training_labels.txt', 'corpus/msr_training_dict.txt')

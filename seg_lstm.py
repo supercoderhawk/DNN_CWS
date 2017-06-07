@@ -23,7 +23,7 @@ class SegLSTM(SegBase):
     self.tag_count = 4
     self.concat_embed_size = self.window_size * self.embed_size
     self.vocab_size = constant.VOCAB_SIZE
-    self.alpha = 0.02
+    self.alpha = 0.05
     self.lam = 0.0001
     self.eta = 0.02
     self.dropout_rate = 0.2
@@ -172,7 +172,7 @@ class SegLSTM(SegBase):
     sentence_scores = self.sess.run(self.word_scores, feed_dict={self.x: np.expand_dims(sentence_embeds, 0)})
     init_A_val = self.init_A.eval(session=self.sess)
     A_val = self.A.eval(session=self.sess)
-    # print(A_val)
+    print(A_val)
     current_tags = self.viterbi(sentence_scores, A_val, init_A_val)
     return self.tags2words(sentence, current_tags), current_tags
 

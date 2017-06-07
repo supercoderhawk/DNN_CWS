@@ -58,7 +58,7 @@ def cal_val(seq):
 
 
 def test(cws, model):
-  with open('data/test.utf8', 'r', encoding='utf-8') as file:
+  with open('tmp/test.utf8', 'r', encoding='utf-8') as file:
     lines = file.read().splitlines()
     sentences = lines[::2][:100]
     labels = lines[1::2][:100]
