@@ -88,10 +88,11 @@ class SegLSTM(SegBase):
     for i in range(10):
       for sentence_index, (sentence, tags) in enumerate(zip(self.words_batch, self.tags_batch)):
         self.train_sentence(sentence, tags, len(tags))
-        if sentence_index % 500 == 0:
+        if sentence_index >0 and sentence_index % 500 == 0:
           print(sentence_index)
           print(time.time() - last_time)
           last_time = time.time()
+          print(self.cal_loss(sentence_index-500,sentence_index))
       print(self.sess.run(self.init_A))
       self.saver.save(self.sess, 'tmp/lstm-model%d.ckpt' % i)
 
@@ -163,6 +164,17 @@ class SegLSTM(SegBase):
       before_curr = curr_tag
 
     return A_update, init_A_update, update_init
+
+  def cal_loss(self, start, end):
+    loss = 0.0
+    A = self.A.eval(session=self.sess)
+    init_A = self.init_A.eval(session=self.sess)
+    for sentence_index, (sentence, tags) in enumerate(zip(self.words_batch[start:end], self.tags_batch[start:end])):
+      sentence_embeds = self.sess.run(self.lookup_op, feed_dict={self.sentence_holder: sentence}).reshape(
+        [len(sentence), self.concat_embed_size])
+      sentence_score = self.sess.run(self.word_scores, feed_dict={self.x: np.expand_dims(sentence_embeds, 0)})
+      loss += self.cal_sentence_loss(tags, sentence_score, A, init_A)
+    return loss
 
   def seg(self, sentence, model_path='tmp/lstm-model0.ckpt'):
     self.saver.restore(self.sess, model_path)

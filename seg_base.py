@@ -1,5 +1,6 @@
-#-*- coding: UTF-8 -*-
+# -*- coding: UTF-8 -*-
 import numpy as np
+import math
 
 
 class SegBase:
@@ -41,7 +42,7 @@ class SegBase:
       max_index = path[max_index][i]
       corr_path[i - 1] = max_index
     if return_score:
-      return corr_path, path_score[max_index, :]
+      return corr_path, path_score[max_index, -1]
     else:
       return corr_path
 
@@ -82,3 +83,17 @@ class SegBase:
       words.append(word)
 
     return words
+
+  def cal_sentence_loss(self, tags, sentence_scores, A, init_A):
+
+    _, score = self.viterbi(sentence_scores, A, init_A, True)
+    loss = 0.0
+    before = 0
+    for index, (corr_tag, scores) in enumerate(zip(tags, sentence_scores.T)):
+      if index == 0:
+        loss += scores[corr_tag] + init_A[corr_tag]
+      else:
+        loss += scores[corr_tag] + A[before, corr_tag]
+      before = corr_tag
+
+    return math.fabs(loss - score)
