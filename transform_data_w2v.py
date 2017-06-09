@@ -6,15 +6,31 @@ from transform_data import TransformData
 
 
 class TransformDataW2V(TransformData):
-  def __init__(self, batch_size, num_skips, skip_window,file,corpus):
+  def __init__(self, batch_size, num_skips, skip_window):
     TransformData.__init__(self, 'corpus/dict.utf8', ['pku'])
     self.batch_size = batch_size
     self.num_skips = num_skips
     self.skip_window = skip_window
     self.data_index = 0
     self.span = 2 * self.skip_window + 1
-    self.words = [item for sublist in self.words_index for item in sublist]
+    self.words = self.generate_words('sogou')
     self.word_count = len(self.words)
+
+  def generate_words(self, name):
+    if name == 'pku':
+      return [item for sublist in self.words_index for item in sublist]
+    elif name == 'sogou':
+      with open('corpus/sogou.txt', 'r', encoding='utf8') as file:
+        return self.sentence2index(file.read())
+
+  def sentence2index(self, sentence):
+    index = []
+    for ch in sentence:
+      if ch in self.dictionary:
+        index.append(self.dictionary[ch])
+      else:
+        index.append(0)
+    return index
 
   def generate_batch(self):
     batch = np.ndarray(shape=(self.batch_size), dtype=np.int32)
