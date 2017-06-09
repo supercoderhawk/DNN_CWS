@@ -7,8 +7,9 @@ from transform_data_w2v import TransformDataW2V
 
 
 class Word2Vec:
-  def __init__(self, batch_size=128, num_skips=2, skip_window=1, vocab_size=constant.VOCAB_SIZE, embed_size=50,
+  def __init__(self, output, batch_size=128, num_skips=2, skip_window=1, vocab_size=constant.VOCAB_SIZE, embed_size=50,
                num_sampled=64, steps=100000):
+    self.output = output
     self.batch_size = batch_size
     self.num_skips = num_skips
     self.skip_window = skip_window
@@ -51,9 +52,9 @@ class Word2Vec:
           # The average loss is an estimate of the loss over the last 2000 batches.
           print("Average loss at step ", step, ": ", aver_loss)
           aver_loss = 0
-      np.save('tmp/embed',self.embeddings.eval())
-      #self.test(sess)
-  def test(self,sess):
+      np.save(self.output, self.embeddings.eval())
+
+  def test(self):
     valid_dataset = [3021]
     norm = tf.sqrt(tf.reduce_sum(tf.square(self.embeddings), 1, keep_dims=True))
     normalized_embeddings = self.embeddings / norm
@@ -62,10 +63,11 @@ class Word2Vec:
     similarity = tf.abs(tf.matmul(
       valid_embeddings, normalized_embeddings, transpose_b=True))
     print(similarity.eval())
-    pair = zip(range(self.vocab_size),similarity.eval()[0])
+    pair = zip(range(self.vocab_size), similarity.eval()[0])
     spair = sorted(pair, key=lambda x: x[1])
     print(spair[0:10])
 
+
 if __name__ == '__main__':
-  w2v = Word2Vec()
+  w2v = Word2Vec('corpus/lstm/embeddings', embed_size=100)
   w2v.train()
