@@ -31,6 +31,7 @@ def test_seg_dnn():
   #print(seg.seg('小明来自南京师范大学'))
   #print(seg.seg('小明是上海理工大学的学生'))
   print(seg.seg('小明来自南京师范大学'))
+  print(seg.seg('小明是上海理工大学的学生'))
   test(seg,'tmp/lstm-model0.ckpt')
   # print(seq)
   # cal_val(seq)
