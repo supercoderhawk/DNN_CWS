@@ -23,14 +23,14 @@ class SegBase:
     """
 
     length = emission.shape[1]
-    path = np.ones([4, length], dtype=np.int32) * -1
+    path = np.ones([self.tags_count, length], dtype=np.int32) * -1
     corr_path = np.zeros([length], dtype=np.int32)
-    path_score = np.ones([4, length], dtype=np.float64) * (np.finfo('f').min / 2)
+    path_score = np.ones([self.tags_count, length], dtype=np.float64) * (np.finfo('f').min / 2)
     path_score[:, 0] = init_A + emission[:, 0]
 
     for pos in range(1, length):
-      for t in range(4):
-        for prev in range(4):
+      for t in range(self.tags_count):
+        for prev in range(self.tags_count):
           temp = path_score[prev][pos - 1] + A[prev][t] + emission[t][pos]
           if temp >= path_score[t][pos]:
             path[t][pos] = prev
