@@ -15,7 +15,9 @@
 pip install tensorflow
 ```
 
-2. clone本项目至本地
+2. clone本项目至本地.
+
+3. 运行文件`init.py`，生成训练用数据
 
 ### 开始使用
 
